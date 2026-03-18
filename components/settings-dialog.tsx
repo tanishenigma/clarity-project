@@ -270,7 +270,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   if (isMd) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="p-0 overflow-hidden bg-card border border-border max-w-2xl w-full h-[80vh] flex flex-col z-70 rounded-2xl">
+        <DialogContent className="p-0 overflow-hidden bg-card border border-border max-w-3xl h-[80vh] flex flex-col z-70 rounded-2xl">
           <DialogTitle className="sr-only">Settings</DialogTitle>
 
           {/* Header */}

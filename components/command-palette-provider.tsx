@@ -1,8 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { CommandPalette } from "@/components/command-palette";
 import { SettingsDialog } from "@/components/settings-dialog";
+
+const CommandPalette = dynamic(
+  () =>
+    import("@/components/command-palette").then(
+      (module) => module.CommandPalette,
+    ),
+  {
+    ssr: false,
+  },
+);
 
 /**
  * Wraps the app shell to mount the floating Command Palette (Cmd+K)

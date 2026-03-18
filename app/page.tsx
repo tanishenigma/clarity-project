@@ -16,7 +16,6 @@ import spaceImageDark from "@/public/image_dark.png";
 import logoLight from "@/public/logo_light.png";
 import logoDark from "@/public/logo_dark.png";
 import { useEffect } from "react";
-const lenis = useLenis();
 
 const ContainerScroll = dynamic(
   () =>
@@ -58,6 +57,7 @@ const BlurFade = ({
 );
 
 export default function LandingPage() {
+  const lenis = useLenis();
   const year = new Date().getFullYear();
   useEffect(() => {
     if (!lenis) return;

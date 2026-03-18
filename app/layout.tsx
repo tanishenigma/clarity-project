@@ -27,6 +27,26 @@ const colorThemeBootstrapScript = `(function(){try{var id=localStorage.getItem('
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  icons: {
+    icon: [
+      {
+        url: "/logo_small_light.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/logo_small_dark.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+    shortcut: [
+      {
+        url: "/logo_small_light.svg",
+        type: "image/svg+xml",
+      },
+    ],
+  },
   title: {
     default: "Clarity | Your Personal Learning Companion",
     template: "%s | Clarity",

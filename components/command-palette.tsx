@@ -14,12 +14,9 @@ import {
 } from "@/components/ui/command";
 import {
   LayoutDashboard,
-  // FolderInput,
-  // BarChart3,
   Layers2,
   SquarePen,
   Settings,
-  // BookOpen,
   Sparkles,
   LogOut,
   Plus,
@@ -72,7 +69,6 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
     },
     { label: "Spaces", icon: Layers2, href: "/spaces", shortcut: "S" },
     { label: "Chat", icon: SquarePen, href: "/chat", shortcut: "C" },
-    // { label: "Analytics", icon:  href: "/study/analytics", shortcut: "E" },
   ];
 
   return (

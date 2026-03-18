@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Trash2, Eye } from "lucide-react";
+import { FileText, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,12 +22,6 @@ interface ContentTabProps {
 }
 
 export function ContentTab({ content, onDelete }: ContentTabProps) {
-  const handleView = (url: string) => {
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-  };
-
   if (content.length === 0) {
     return (
       <Card className="p-8 text-center flex flex-col items-center justify-center min-h-50">
@@ -71,25 +65,13 @@ export function ContentTab({ content, onDelete }: ContentTabProps) {
           </div>
 
           <div className="flex items-center gap-2 mt-auto pt-2 border-t">
-            {/* View Button */}
-            {item.source?.url && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex-1 h-8 text-xs hover:bg-primary/10 hover:text-primary"
-                onClick={() => handleView(item.source.url)}>
-                <Eye className="w-3.5 h-3.5 mr-2" />
-                View
-              </Button>
-            )}
-
             {/* Delete Button */}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                  className="flex-1 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </AlertDialogTrigger>

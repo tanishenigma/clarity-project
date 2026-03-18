@@ -5,6 +5,8 @@ import Image from "next/image";
 import { redirect, usePathname } from "next/navigation";
 import logoLight from "@/public/logo_light.png";
 import logoDark from "@/public/logo_dark.png";
+import logoSmallLight from "@/public/logo_small_light.svg";
+import logoSmallDark from "@/public/logo_small_dark.svg";
 import {
   Brain,
   LogIn,
@@ -534,10 +536,21 @@ export function Sidebar({ spaceId }: SidebarProps) {
         <aside className="hidden md:flex w-16 flex-col h-screen border-r border-border bg-sidebar transition-all duration-300 ease-in-out">
           {/* Logo */}
           <div className="group relative flex h-16 w-full items-center justify-center border-b border-sidebar-border bg-sidebar">
-            <Brain
-              size={20}
-              onClick={toggleSidebar}
-              className="absolute text-primary transition-[opacity,transform] duration-500 ease-in-out opacity-100 scale-100 rotate-0 group-hover:opacity-0 group-hover:scale-75 group-hover:-rotate-90 cursor-pointer"
+            <Image
+              src={logoSmallLight}
+              alt="Clarity"
+              width={24}
+              height={20}
+              sizes="84px"
+              className="dark:hidden absolute text-primary transition-[opacity,transform] duration-500 ease-in-out opacity-100 scale-100 rotate-0 group-hover:opacity-0 group-hover:scale-75 group-hover:-rotate-90 cursor-pointer"
+            />
+            <Image
+              src={logoSmallDark}
+              alt="Clarity"
+              width={24}
+              height={20}
+              sizes="84px"
+              className="hidden dark:block absolute text-primary transition-[opacity,transform] duration-500 ease-in-out opacity-100 scale-100 rotate-0 group-hover:opacity-0 group-hover:scale-75 group-hover:-rotate-90 cursor-pointer"
             />
             <PanelLeft
               size={20}
@@ -565,15 +578,15 @@ export function Sidebar({ spaceId }: SidebarProps) {
           </nav>
 
           {/* Quick Notes + Profile footer */}
-          {/* <div className="px-2 pb-4 pt-2 border-t border-sidebar-border flex flex-col items-center gap-2">
+          <div className="ml-2 px-2 pb-4 pt-2 border-t border-sidebar-border flex flex-col items-center gap-2">
             <button
               title="Quick Notes"
               onClick={() =>
                 window.dispatchEvent(new Event("toggle-quick-notes"))
               }
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground
+              className="w-10 h-0 flex items-center justify-center rounded-lg text-muted-foreground
                 hover:text-primary hover:bg-primary/10 transition-all duration-200 group">
-              <StickyNote className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+              {/* <StickyNote className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" /> */}
             </button>
             {user ? (
               <ProfileDropdown collapsed />
@@ -587,7 +600,7 @@ export function Sidebar({ spaceId }: SidebarProps) {
                 </Button>
               </Link>
             )}
-          </div> */}
+          </div>
         </aside>
       )}
     </div>

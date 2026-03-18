@@ -4,10 +4,8 @@ import { useState, useEffect, use, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Upload, Loader2, ArrowLeft } from "lucide-react";
-import { TutorChat } from "@/components/tutor-chat";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
 
 // Imports from the new components folder
 import { SpaceData } from "@/components/spaces-components/types";
@@ -33,15 +31,6 @@ export default function SpaceDetailPage({
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [isStudyMode, setIsStudyMode] = useState(false);
-  // Topic to auto-send when navigating from mindmap root → chat
-  const [chatTopic, setChatTopic] = useState<string | null>(null);
-
-  const handleNavigateToChat = useCallback((topic: string) => {
-    setChatTopic(
-      `Please explain the topic "${topic}" in detail, covering key concepts, important subtopics, and any relationships to other ideas in this space.`,
-    );
-    setActiveTab("chat");
-  }, []);
 
   const fetchSpace = useCallback(async () => {
     try {
@@ -186,7 +175,7 @@ export default function SpaceDetailPage({
               userId={user.id}
               spaceName={space.name}
               hasContent={stats.contentCount > 0}
-              onNavigateToChat={handleNavigateToChat}
+              onNavigateToChat={() => {}}
             />
           ) : (
             <SignInPromptCard message="Please sign in to generate a mindmap" />
@@ -206,6 +195,7 @@ export default function SpaceDetailPage({
           )}
         </TabsContent>
 
+        {/*
         <TabsContent value="chat" className="space-y-4">
           {user ? (
             <Card className="p-0 overflow-hidden h-150 border-primary/20">
@@ -219,6 +209,7 @@ export default function SpaceDetailPage({
             <SignInPromptCard message="Please sign in to access the chat feature" />
           )}
         </TabsContent>
+        */}
       </Tabs>
     </div>
   );
