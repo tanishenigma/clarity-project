@@ -112,7 +112,7 @@ export default function RootLayout({
             <PersonalizationProvider>{children}</PersonalizationProvider>
           </AuthProvider>
         </ThemeProvider>
-        {/* <Analytics /> */}
+        <Analytics />
       </body>
     </html>
   );

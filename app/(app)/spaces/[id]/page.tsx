@@ -2,10 +2,12 @@
 
 import { useState, useEffect, use, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Upload, Loader2, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
+import { TutorChat } from "@/components/tutor-chat";
 
 // Imports from the new components folder
 import { SpaceData } from "@/components/spaces-components/types";
@@ -195,21 +197,15 @@ export default function SpaceDetailPage({
           )}
         </TabsContent>
 
-        {/*
         <TabsContent value="chat" className="space-y-4">
           {user ? (
             <Card className="p-0 overflow-hidden h-150 border-primary/20">
-              <TutorChat
-                spaceId={id}
-                userId={user.id}
-                initialMessage={chatTopic ?? undefined}
-              />
+              <TutorChat spaceId={id} userId={user.id} />
             </Card>
           ) : (
             <SignInPromptCard message="Please sign in to access the chat feature" />
           )}
         </TabsContent>
-        */}
       </Tabs>
     </div>
   );

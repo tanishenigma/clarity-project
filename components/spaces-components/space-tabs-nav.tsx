@@ -54,11 +54,11 @@ const buildNavItems = (stats: SpaceTabsNavProps["stats"]): NavItem[] => [
     icon: BookOpen,
     tab: "summary",
   },
-  // {
-  //   label: "Study Chat",
-  //   icon: MessageCircle,
-  //   tab: "chat",
-  // },
+  {
+    label: "Study Chat",
+    icon: MessageCircle,
+    tab: "chat",
+  },
 ];
 
 export function SpaceTabsNav({

@@ -11,7 +11,7 @@ import {
   Brain,
   LogIn,
   PanelLeft,
-  // BarChart3,
+  BarChart3,
   LayoutDashboard,
   Layers2,
   SquarePen,
@@ -146,8 +146,8 @@ export function Sidebar({ spaceId }: SidebarProps) {
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/add-content", icon: Plus, label: "Add Content" },
     { href: "/spaces", icon: Layers2, label: "Spaces" },
+    { href: "/study/analytics", icon: BarChart3, label: "Study Analytics" },
     { href: "/chat", icon: SquarePen, label: "Chat" },
-    // { href: "/study/analytics", icon: BarChart3, label: "Analytics" },
     { href: "/notes", icon: StickyNote, label: "Notes" },
   ];
 
@@ -506,7 +506,7 @@ export function Sidebar({ spaceId }: SidebarProps) {
 
           {/* Quick Notes + Profile footer */}
           <div className="px-4 pb-4 pt-2 border-sidebar-border space-y-2">
-            {/* <Button
+            <Button
               variant="ghost"
               size="sm"
               onClick={() =>
@@ -515,7 +515,7 @@ export function Sidebar({ spaceId }: SidebarProps) {
               className="w-full justify-start gap-3 group transition-all duration-200 hover:bg-primary/10 rounded-[10px]">
               <StickyNote className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:scale-110 transition-all duration-200" />
               <span className="text-sm">Quick Notes</span>
-            </Button> */}
+            </Button>
             {user ? (
               <ProfileDropdown />
             ) : (
