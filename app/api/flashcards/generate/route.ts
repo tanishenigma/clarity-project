@@ -38,21 +38,26 @@ export async function POST(request: NextRequest) {
       .substring(0, 5000);
 
     const userSettings = await getUserAPISettings(userId);
-    const model = createAIClient(
-      "gemini-2.5-flash-lite",
-      0.7,
-      userSettings,
-      true,
-    );
 
-    const difficultyGuide =
-      difficulty === "easy"
-        ? "Focus on definitions and basic facts"
-        : difficulty === "medium"
-          ? "Include concept explanations and relationships between ideas"
-          : "Cover complex analysis, edge cases, and deeper synthesis";
+    let cards: Array<{ question: string; answer: string; tags?: string[] }>;
 
-    const prompt = `Generate ${numCards} flashcards (${difficulty} difficulty) based on the following content.
+    // Try LLM-based generation first; fall back to local T5 via Flask
+    try {
+      const model = createAIClient(
+        "gemini-2.5-flash-lite",
+        0.7,
+        userSettings,
+        true,
+      );
+
+      const difficultyGuide =
+        difficulty === "easy"
+          ? "Focus on definitions and basic facts"
+          : difficulty === "medium"
+            ? "Include concept explanations and relationships between ideas"
+            : "Cover complex analysis, edge cases, and deeper synthesis";
+
+      const prompt = `Generate ${numCards} flashcards (${difficulty} difficulty) based on the following content.
 ${difficultyGuide}
 
 For each flashcard, provide a JSON object with:
@@ -74,31 +79,42 @@ ${combinedText}
 IMPORTANT: Return ONLY a valid JSON array, no markdown formatting, no code blocks. Example format:
 [{"question": "What is $x$ if $2x = 8$?", "answer": "Dividing both sides by 2 gives $x = 4$.", "tags": ["algebra"]}]`;
 
-    const response = await model.invoke([
-      new SystemMessage(
-        "You are a flashcard generation assistant. You MUST respond with ONLY a valid JSON array — no markdown, no code fences, no explanation, no prose before or after. Output raw JSON only.",
-      ),
-      new HumanMessage(prompt),
-    ]);
-    const responseText = response.content.toString();
-
-    // Parse the JSON response
-    let cards;
-    try {
+      const response = await model.invoke([
+        new SystemMessage(
+          "You are a flashcard generation assistant. You MUST respond with ONLY a valid JSON array — no markdown, no code fences, no explanation, no prose before or after. Output raw JSON only.",
+        ),
+        new HumanMessage(prompt),
+      ]);
+      const responseText = response.content.toString();
       cards = parseAIJson<any[]>(responseText);
-    } catch (parseError) {
-      console.error("[Flashcards] Failed to parse AI response:", responseText);
-      return NextResponse.json(
-        { error: "Failed to generate flashcards — AI returned invalid JSON" },
-        { status: 500 },
-      );
-    }
 
-    if (!Array.isArray(cards) || cards.length === 0) {
-      return NextResponse.json(
-        { error: "No flashcards were generated" },
-        { status: 500 },
+      if (!Array.isArray(cards) || cards.length === 0) {
+        throw new Error("AI returned empty flashcard array");
+      }
+    } catch (llmError) {
+      // LLM unavailable (no API keys) — fall back to local T5 via Flask
+      console.warn(
+        "[Flashcards] LLM unavailable, falling back to local T5 Flask service:",
+        llmError instanceof Error ? llmError.message : llmError,
       );
+
+      const flaskUrl = process.env.CRAG_FLASK_URL ?? "http://localhost:5001";
+      const flaskRes = await fetch(`${flaskUrl}/api/flashcards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: combinedText, numCards }),
+        signal: AbortSignal.timeout(120_000),
+      });
+
+      if (!flaskRes.ok) {
+        const errText = await flaskRes.text().catch(() => flaskRes.statusText);
+        throw new Error(`Flask flashcard error ${flaskRes.status}: ${errText}`);
+      }
+
+      const flaskData = (await flaskRes.json()) as {
+        flashcards: Array<{ question: string; answer: string }>;
+      };
+      cards = flaskData.flashcards ?? [];
     }
 
     // Build flashcard documents

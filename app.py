@@ -134,5 +134,53 @@ def home():
     '''
 
 
+@app.route('/api/flashcards', methods=['POST'])
+def api_flashcards():
+    """Generate flashcards from content text using the local T5 model.
+
+    Request JSON:
+        { "text": "...", "numCards": 10, "difficulty": "medium" }
+
+    Response JSON:
+        { "flashcards": [{"question": "...", "answer": "..."}, ...] }
+    """
+    import re
+
+    data = request.get_json(force=True, silent=True) or {}
+    text = data.get('text', '').strip()
+    num_cards = int(data.get('numCards', 10))
+
+    if not text:
+        return jsonify({'error': 'text is required'}), 400
+
+    # Split into sentences and filter short ones
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 40]
+
+    if not sentences:
+        return jsonify({'flashcards': []})
+
+    # Pick evenly spaced sentences up to num_cards
+    step = max(1, len(sentences) // num_cards)
+    selected = sentences[::step][:num_cards]
+
+    flashcards = []
+    for sent in selected:
+        # Extract a key phrase (first 5 words) to form the question
+        words = sent.split()
+        key_phrase = ' '.join(words[:min(5, len(words))])
+
+        # Ask T5 to answer a question about this sentence
+        question_prompt = f"What does this explain: {key_phrase}?"
+        t5_answer = generate_answer(question_prompt, [sent])
+
+        flashcards.append({
+            'question': question_prompt,
+            'answer': t5_answer if t5_answer and len(t5_answer) > 5 else sent,
+        })
+
+    return jsonify({'flashcards': flashcards})
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

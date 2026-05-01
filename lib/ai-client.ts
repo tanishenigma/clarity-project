@@ -27,6 +27,8 @@ export class AIClient {
   private modelName: string;
   private temperature: number;
   private jsonMode: boolean;
+  /** True when no API keys are configured — invoke/stream will throw lazily. */
+  private noProvidersAvailable = false;
 
   constructor(
     modelName?: string,
@@ -80,9 +82,13 @@ export class AIClient {
       const order: ProviderName[] = ["gemini", "euri", "groq"];
       const available = order.find((p) => this.isAvailable(p));
       if (!available) {
-        throw new Error(
-          "No AI provider keys configured. Please add at least one API key in Settings.",
+        console.warn(
+          "[AIClient] No AI provider keys configured — LLM calls will fail gracefully. Using local T5 via CRAG.",
         );
+        this.noProvidersAvailable = true;
+        this.primaryProvider = "gemini"; // sentinel; invoke will throw if called
+        this.fallbackOrder = [];
+        return;
       }
       console.warn(
         `Primary provider "${preferred}" has no key — using "${available}" instead.`,
@@ -148,6 +154,11 @@ export class AIClient {
   // -------------------------------------------------------------------------
 
   async invoke(messages: BaseMessage[]): Promise<{ content: string }> {
+    if (this.noProvidersAvailable) {
+      throw new Error(
+        "No AI provider keys configured. Please add at least one API key in Settings.",
+      );
+    }
     // Try primary
     try {
       return await this.invokeProvider(this.primaryProvider, messages);
@@ -177,6 +188,11 @@ export class AIClient {
   async *stream(
     messages: BaseMessage[],
   ): AsyncGenerator<string, void, unknown> {
+    if (this.noProvidersAvailable) {
+      throw new Error(
+        "No AI provider keys configured. Please add at least one API key in Settings.",
+      );
+    }
     // Track whether we've already sent data to the consumer.
     // If we have, falling back to another provider would concatenate two
     // different responses and corrupt the stream — so we throw instead.
