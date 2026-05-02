@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePersonalization } from "@/lib/personalization-context";
 import {
   Copy,
@@ -21,6 +21,157 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { Message } from "../chat-components/types";
+import type { Citation } from "../chat-components/types";
+
+const FLASHCARD_PROMPT_PREFIX =
+  "I can generate flashcards for this study space.";
+const QUIZ_PROMPT_PREFIX = "I can generate a quiz for this study space.";
+
+type StudyPromptIntent = "flashcards" | "quiz";
+type StudyPromptDifficulty = "easy" | "medium" | "hard";
+
+interface StudyPromptConfig {
+  intent: StudyPromptIntent;
+  count: number | null;
+  difficulty: StudyPromptDifficulty | null;
+}
+
+function parseStudyPrompt(content: string): StudyPromptConfig | null {
+  const intent = content.startsWith(FLASHCARD_PROMPT_PREFIX)
+    ? "flashcards"
+    : content.startsWith(QUIZ_PROMPT_PREFIX)
+      ? "quiz"
+      : null;
+
+  if (!intent) return null;
+
+  const countMatch = content.match(/count set to\s+(\d+)/i);
+  const difficultyMatch = content.match(
+    /difficulty set to\s+(easy|medium|hard)/i,
+  );
+
+  return {
+    intent,
+    count: countMatch ? Number.parseInt(countMatch[1], 10) : null,
+    difficulty:
+      (difficultyMatch?.[1]?.toLowerCase() as StudyPromptDifficulty) ?? null,
+  };
+}
+
+function StudyPromptCard({
+  prompt,
+  canInteract,
+  onSubmit,
+}: {
+  prompt: StudyPromptConfig;
+  canInteract: boolean;
+  onSubmit?: (reply: string) => void;
+}) {
+  const [selectedCount, setSelectedCount] = useState<number | null>(
+    prompt.count,
+  );
+  const [selectedDifficulty, setSelectedDifficulty] =
+    useState<StudyPromptDifficulty | null>(prompt.difficulty);
+
+  useEffect(() => {
+    setSelectedCount(prompt.count);
+    setSelectedDifficulty(prompt.difficulty);
+  }, [prompt.count, prompt.difficulty]);
+
+  const baseCountOptions = [5, 10, 15, 20];
+  const countOptions = prompt.count
+    ? Array.from(new Set([...baseCountOptions, prompt.count])).sort(
+        (left, right) => left - right,
+      )
+    : baseCountOptions;
+
+  const title =
+    prompt.intent === "flashcards" ? "Generate flashcards" : "Generate quiz";
+  const countLabel =
+    prompt.intent === "flashcards" ? "How many cards?" : "How many questions?";
+  const description =
+    prompt.count == null && prompt.difficulty == null
+      ? "Choose the amount and difficulty, then generate directly from chat."
+      : prompt.count == null
+        ? `Difficulty is set to ${prompt.difficulty}. Choose how many ${prompt.intent === "flashcards" ? "flashcards" : "questions"} you want.`
+        : `Count is set to ${prompt.count}. Choose the difficulty to continue.`;
+
+  const handleGenerate = () => {
+    if (!selectedCount || !selectedDifficulty || !onSubmit) return;
+    onSubmit(
+      `${selectedCount} ${selectedDifficulty} ${prompt.intent === "flashcards" ? "flashcards" : "quiz questions"}`,
+    );
+  };
+
+  return (
+    <Card className="border border-primary/15 bg-linear-to-br from-background via-primary/5 to-background p-4 shadow-sm">
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            {countLabel}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {countOptions.map((count) => (
+              <Button
+                key={count}
+                type="button"
+                size="sm"
+                variant={selectedCount === count ? "active" : "outline"}
+                className="min-w-12"
+                disabled={!canInteract}
+                onClick={() => setSelectedCount(count)}>
+                {count}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            Difficulty
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {(["easy", "medium", "hard"] as const).map((difficulty) => (
+              <Button
+                key={difficulty}
+                type="button"
+                size="sm"
+                variant={
+                  selectedDifficulty === difficulty ? "active" : "outline"
+                }
+                disabled={!canInteract}
+                onClick={() => setSelectedDifficulty(difficulty)}>
+                {difficulty[0].toUpperCase() + difficulty.slice(1)}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            {canInteract
+              ? "This will continue the chat with your selected options."
+              : "Only the latest study prompt can be submitted from here."}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!canInteract || !selectedCount || !selectedDifficulty}
+            onClick={handleGenerate}>
+            {prompt.intent === "flashcards"
+              ? "Generate flashcards"
+              : "Generate quiz"}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 /* ─── Custom Theme ─── */
 const customCodeTheme: any = {
@@ -262,6 +413,9 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  onCitationClick?: (citation: Citation) => void;
+  onStudyPromptSubmit?: (reply: string) => void;
+  canInteractWithStudyPrompt?: boolean;
 }
 
 export function MessageBubble({
@@ -270,9 +424,13 @@ export function MessageBubble({
   isStreaming = false,
   isCollapsed = false,
   onToggleCollapse,
+  onCitationClick,
+  onStudyPromptSubmit,
+  canInteractWithStudyPrompt = false,
 }: MessageBubbleProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const { personalization } = usePersonalization();
+  const studyPrompt = parseStudyPrompt(message.content);
 
   const formatTime = (date: Date) =>
     date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -364,31 +522,40 @@ export function MessageBubble({
             "relative selection:bg-primary selection:text-primary-foreground",
             isCollapsed && "max-h-30 overflow-hidden",
           )}>
-          <div
-            onDragStart={(e) => e.preventDefault()}
-            className={cn(
-              "prose prose-sm dark:prose-invert max-w-none wrap-break-word text-foreground/90",
-              "prose-p:my-3 prose-p:leading-relaxed",
-              "prose-headings:text-foreground prose-headings:font-bold",
-              "prose-strong:text-foreground",
-              "prose-li:leading-relaxed",
-              "prose-pre:p-0 prose-pre:bg-transparent prose-pre:my-0",
-            )}>
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
-              components={
-                markdownComponents(
-                  copyToClipboard,
-                  copiedId,
-                  message.id,
-                  false,
-                  isStreaming,
-                ) as any
-              }>
-              {message.content}
-            </ReactMarkdown>
-          </div>
+          {studyPrompt ? (
+            <StudyPromptCard
+              prompt={studyPrompt}
+              canInteract={canInteractWithStudyPrompt}
+              onSubmit={onStudyPromptSubmit}
+            />
+          ) : (
+            <div
+              onDragStart={(e) => e.preventDefault()}
+              data-assistant-content
+              className={cn(
+                "prose prose-sm dark:prose-invert max-w-none wrap-break-word text-foreground/90",
+                "prose-p:my-3 prose-p:leading-relaxed",
+                "prose-headings:text-foreground prose-headings:font-bold",
+                "prose-strong:text-foreground",
+                "prose-li:leading-relaxed",
+                "prose-pre:p-0 prose-pre:bg-transparent prose-pre:my-0",
+              )}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={
+                  markdownComponents(
+                    copyToClipboard,
+                    copiedId,
+                    message.id,
+                    false,
+                    isStreaming,
+                  ) as any
+                }>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )}
 
           {/* Gradient fade at the bottom of a collapsed message */}
           {isCollapsed && (
@@ -397,45 +564,51 @@ export function MessageBubble({
         </div>
 
         {/* Show more / Show less button below the content */}
-        <button
-          onClick={onToggleCollapse}
-          className="flex items-center gap-1 text-xs font-medium text-primary/70 hover:text-primary transition-colors mt-0.5 ml-0 px-1 py-0.5 rounded hover:bg-primary/5">
-          {isCollapsed ? (
-            <>
-              <ChevronDown className="h-3.5 w-3.5" />
-              Show more
-            </>
-          ) : (
-            <>
-              <ChevronUp className="h-3.5 w-3.5" />
-              Show less
-            </>
-          )}
-        </button>
+        {!studyPrompt && (
+          <button
+            onClick={onToggleCollapse}
+            className="flex items-center gap-1 text-xs font-medium text-primary/70 hover:text-primary transition-colors mt-0.5 ml-0 px-1 py-0.5 rounded hover:bg-primary/5">
+            {isCollapsed ? (
+              <>
+                <ChevronDown className="h-3.5 w-3.5" />
+                Show more
+              </>
+            ) : (
+              <>
+                <ChevronUp className="h-3.5 w-3.5" />
+                Show less
+              </>
+            )}
+          </button>
+        )}
 
-        {!isCollapsed &&
+        {!studyPrompt &&
+          !isCollapsed &&
           extractYouTubeIds(message.content).map((id) => (
             <YouTubeEmbed key={id} videoId={id} />
           ))}
 
-        {!isCollapsed && message.files && message.files.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-2">
-            {message.files.map((file, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-muted/60 transition-colors border border-border/50 rounded-full px-3 py-1.5 w-fit">
-                {file.type?.startsWith("image/") ? (
-                  <ImageIcon className="h-3.5 w-3.5 shrink-0" />
-                ) : (
-                  <FileText className="h-3.5 w-3.5 shrink-0" />
-                )}
-                <span className="truncate max-w-37.5">{file.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {!studyPrompt &&
+          !isCollapsed &&
+          message.files &&
+          message.files.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              {message.files.map((file, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted/40 hover:bg-muted/60 transition-colors border border-border/50 rounded-full px-3 py-1.5 w-fit">
+                  {file.type?.startsWith("image/") ? (
+                    <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                  )}
+                  <span className="truncate max-w-37.5">{file.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {!isCollapsed && (
+        {!studyPrompt && !isCollapsed && (
           <div className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <Button
               size="sm"
@@ -456,6 +629,24 @@ export function MessageBubble({
             </Button>
           </div>
         )}
+
+        {/* Source citations */}
+        {!studyPrompt &&
+          !isCollapsed &&
+          message.citations &&
+          message.citations.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              {message.citations.map((c) => (
+                <button
+                  key={c.idx}
+                  onClick={() => onCitationClick?.(c)}
+                  title={c.snippet}
+                  className="inline-flex items-center gap-1 text-xs font-medium bg-muted/60 hover:bg-primary/15 text-muted-foreground hover:text-primary border border-border/60 rounded-full px-2.5 py-1 transition-colors">
+                  <FileText className="h-3 w-3 shrink-0" />[{c.idx}] {c.title}
+                </button>
+              ))}
+            </div>
+          )}
       </div>
     </div>
   );

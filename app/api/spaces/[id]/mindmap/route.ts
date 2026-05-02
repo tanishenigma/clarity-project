@@ -8,6 +8,7 @@ import ContentModel from "@/lib/models/Content";
 import FlashcardModel from "@/lib/models/Flashcard";
 import QuizModel from "@/lib/models/Quiz";
 import { parseAIJson } from "@/lib/utils/parse-ai-json";
+import { invokeLocalOllama } from "@/lib/services/study-generation";
 
 // GET - Retrieve persisted mindmap for a space
 export async function GET(
@@ -139,7 +140,6 @@ export async function POST(
     const contextString = contextParts.join("\n").substring(0, 15000);
 
     const userSettings = await getUserAPISettings(userId);
-    const model = createAIClient("gemini-2.5-flash-lite", 0.3, userSettings);
 
     const prompt = `You are generating a knowledge mindmap for a student's study space.
 
@@ -175,24 +175,29 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this exact st
 
 Keep labels concise (max 5 words). Make it educationally meaningful.`;
 
-    const response = await model.invoke([
-      new SystemMessage(
-        "You are a mindmap generation assistant. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no explanation, no prose before or after. Output raw JSON only.",
-      ),
-      new HumanMessage(prompt),
-    ]);
-    const responseText = response.content.toString();
+    const systemInstruction =
+      "You are a mindmap generation assistant. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no explanation, no prose before or after. Output raw JSON only.";
 
     let mindmapData;
     try {
+      const model = createAIClient("gemini-2.5-flash-lite", 0.3, userSettings);
+      const response = await model.invoke([
+        new SystemMessage(systemInstruction),
+        new HumanMessage(prompt),
+      ]);
       mindmapData = parseAIJson<{ nodes: unknown[]; edges: unknown[] }>(
-        responseText,
+        response.content.toString(),
       );
-    } catch (parseError) {
-      console.error("[Mindmap] Failed to parse AI response:", responseText);
-      return NextResponse.json(
-        { error: "Failed to generate mindmap — AI returned invalid JSON" },
-        { status: 500 },
+    } catch (providerError) {
+      console.warn(
+        "[Mindmap] Provider generation failed, using local Ollama fallback:",
+        providerError instanceof Error ? providerError.message : providerError,
+      );
+      mindmapData = parseAIJson<{ nodes: unknown[]; edges: unknown[] }>(
+        await invokeLocalOllama(`${systemInstruction}\n\n${prompt}`, {
+          temperature: 0.2,
+          numPredict: 4096,
+        }),
       );
     }
 

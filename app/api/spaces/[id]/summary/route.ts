@@ -5,6 +5,152 @@ import { getUserAPISettings, createAIClient } from "@/lib/ai-client";
 import SpaceSummaryModel from "@/lib/models/SpaceSummary";
 import SpaceModel from "@/lib/models/Space";
 import ContentModel from "@/lib/models/Content";
+import { invokeLocalOllama } from "@/lib/services/study-generation";
+
+function parseGeneratedSummary(responseText: string) {
+  let jsonText = responseText.trim();
+
+  const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) jsonText = fenceMatch[1].trim();
+
+  const objMatch = jsonText.match(/\{[\s\S]*\}/);
+  if (objMatch) jsonText = objMatch[0];
+
+  const VALID_AFTER_BACKSLASH = new Set([
+    '"',
+    "\\",
+    "/",
+    "b",
+    "f",
+    "n",
+    "r",
+    "t",
+    "u",
+  ]);
+
+  function sanitizeJsonString(raw: string): string {
+    let result = "";
+    let inString = false;
+    let i = 0;
+    while (i < raw.length) {
+      const ch = raw[i];
+
+      if (!inString) {
+        if (ch === '"') inString = true;
+        result += ch;
+        i++;
+        continue;
+      }
+
+      if (ch === "\\") {
+        const next = raw[i + 1];
+        if (next === undefined) {
+          result += ch;
+          i++;
+          continue;
+        }
+
+        if (VALID_AFTER_BACKSLASH.has(next)) {
+          result += ch + next;
+          i += 2;
+          continue;
+        }
+
+        result += "\\\\" + next;
+        i += 2;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = false;
+        result += ch;
+        i++;
+        continue;
+      }
+
+      if (ch === "\n") {
+        result += "\\n";
+        i++;
+        continue;
+      }
+      if (ch === "\r") {
+        result += "\\r";
+        i++;
+        continue;
+      }
+      if (ch === "\t") {
+        result += "\\t";
+        i++;
+        continue;
+      }
+
+      result += ch;
+      i++;
+    }
+    return result;
+  }
+
+  try {
+    return JSON.parse(jsonText) as {
+      outline: string;
+      quickReference: Record<string, string>;
+    };
+  } catch {
+    try {
+      return JSON.parse(sanitizeJsonString(jsonText)) as {
+        outline: string;
+        quickReference: Record<string, string>;
+      };
+    } catch {
+      const sanitized = sanitizeJsonString(jsonText);
+      let depth = 0;
+      let lastGoodDepth1 = 0;
+      let lastGoodDepth2 = 0;
+      let inStr = false;
+      for (let i = 0; i < sanitized.length; i++) {
+        const c = sanitized[i];
+        if (inStr) {
+          if (c === "\\") {
+            i++;
+            continue;
+          }
+          if (c === '"') {
+            inStr = false;
+            lastGoodDepth2 = depth === 2 ? i + 1 : lastGoodDepth2;
+          }
+          continue;
+        }
+        if (c === '"') {
+          inStr = true;
+          continue;
+        }
+        if (c === "{" || c === "[") depth++;
+        else if (c === "}" || c === "]") {
+          depth--;
+          if (depth === 1) lastGoodDepth1 = i + 1;
+          if (depth === 2) lastGoodDepth2 = i + 1;
+        } else if (c === ",") {
+          if (depth === 1) lastGoodDepth1 = i + 1;
+          if (depth === 2) lastGoodDepth2 = i + 1;
+        }
+      }
+
+      let truncated: string;
+      if (lastGoodDepth2 > lastGoodDepth1) {
+        truncated =
+          sanitized.slice(0, lastGoodDepth2).trimEnd().replace(/,$/, "") + "}}";
+      } else {
+        truncated =
+          sanitized.slice(0, lastGoodDepth1).trimEnd().replace(/,$/, "") + "}}";
+      }
+
+      return JSON.parse(truncated) as {
+        outline: string;
+        quickReference: Record<string, string>;
+      };
+    }
+  }
+}
 
 // GET - Retrieve persisted summary for a space
 export async function GET(
@@ -111,12 +257,6 @@ export async function POST(
       const contextString = contextParts.join("\n").substring(0, 8000);
 
       const userSettings = await getUserAPISettings(userId);
-      const model = createAIClient(
-        "gemini-2.5-flash-lite",
-        0.3,
-        userSettings,
-        true,
-      );
 
       const systemMsg = new SystemMessage(
         "You are an expert study-material summariser. " +
@@ -169,187 +309,37 @@ Return ONLY valid JSON like:
   }
 }`;
 
-      const response = await model.invoke([
-        systemMsg,
-        new HumanMessage(prompt),
-      ]);
-      const responseText = response.content.toString();
-
-      // ── Robust JSON extraction ────────────────────────────────────────────
-      let jsonText = responseText.trim();
-
-      // 1. Strip markdown code fences if present
-      const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (fenceMatch) jsonText = fenceMatch[1].trim();
-
-      // 2. Extract outermost JSON object if there is surrounding text
-      const objMatch = jsonText.match(/\{[\s\S]*\}/);
-      if (objMatch) jsonText = objMatch[0];
-
-      // 3. Sanitise the JSON string so it can be parsed.
-      //    Two classes of problems seen in practice:
-      //      a) Bare newlines / tabs inside JSON string values
-      //      b) Invalid escape sequences from LaTeX math:
-      //         \sum \log \frac \alpha etc. — JSON only allows
-      //         \" \\ \/ \b \f \n \r \t \uXXXX after a backslash.
-      //    We walk the raw text character-by-character, tracking whether
-      //    we're inside a JSON string, and fix both problems.
-      const VALID_AFTER_BACKSLASH = new Set([
-        '"',
-        "\\",
-        "/",
-        "b",
-        "f",
-        "n",
-        "r",
-        "t",
-        "u",
-      ]);
-
-      function sanitizeJsonString(raw: string): string {
-        let result = "";
-        let inString = false;
-        let i = 0;
-        while (i < raw.length) {
-          const ch = raw[i];
-
-          if (!inString) {
-            // Outside a string: only " can start a string; no escapes possible.
-            if (ch === '"') inString = true;
-            result += ch;
-            i++;
-            continue;
-          }
-
-          // Inside a string:
-          if (ch === "\\") {
-            const next = raw[i + 1];
-            if (next === undefined) {
-              result += ch;
-              i++;
-              continue;
-            }
-
-            if (VALID_AFTER_BACKSLASH.has(next)) {
-              // Valid JSON escape — keep as-is; skip both chars together
-              result += ch + next;
-              // For \uXXXX skip 4 more hex digits too (they're harmless to pass through)
-              i += 2;
-              continue;
-            }
-
-            // Invalid escape (e.g. \s, \l, \f already handled above but kept for safety)
-            // — escape the backslash so \sum becomes \\sum
-            result += "\\\\" + next;
-            i += 2;
-            continue;
-          }
-
-          if (ch === '"') {
-            // Un-escaped quote ends the string
-            inString = false;
-            result += ch;
-            i++;
-            continue;
-          }
-
-          // Bare control characters inside strings
-          if (ch === "\n") {
-            result += "\\n";
-            i++;
-            continue;
-          }
-          if (ch === "\r") {
-            result += "\\r";
-            i++;
-            continue;
-          }
-          if (ch === "\t") {
-            result += "\\t";
-            i++;
-            continue;
-          }
-
-          result += ch;
-          i++;
-        }
-        return result;
-      }
-
       let generated: {
         outline: string;
         quickReference: Record<string, string>;
       };
-      try {
-        generated = JSON.parse(jsonText);
-      } catch {
-        // Try again after sanitising bare control characters inside strings
-        try {
-          generated = JSON.parse(sanitizeJsonString(jsonText));
-        } catch {
-          // Last resort: truncation recovery — find the last fully-closed
-          // property and seal the JSON by appending the right closing tokens.
-          try {
-            const sanitized = sanitizeJsonString(jsonText);
-            // Track the last good cut-point at each nesting depth.
-            // depth 1 = inside the outer {} (after "outline", before/after "quickReference")
-            // depth 2 = inside quickReference {} (after individual section keys)
-            let depth = 0;
-            let lastGoodDepth1 = 0; // last closed / comma at depth 1
-            let lastGoodDepth2 = 0; // last closed / comma at depth 2
-            let inStr = false;
-            for (let i = 0; i < sanitized.length; i++) {
-              const c = sanitized[i];
-              if (inStr) {
-                if (c === "\\") {
-                  i++;
-                  continue;
-                }
-                if (c === '"') {
-                  inStr = false;
-                  lastGoodDepth2 = depth === 2 ? i + 1 : lastGoodDepth2;
-                }
-                continue;
-              }
-              if (c === '"') {
-                inStr = true;
-                continue;
-              }
-              if (c === "{" || c === "[") depth++;
-              else if (c === "}" || c === "]") {
-                depth--;
-                if (depth === 1) lastGoodDepth1 = i + 1;
-                if (depth === 2) lastGoodDepth2 = i + 1;
-              } else if (c === ",") {
-                if (depth === 1) lastGoodDepth1 = i + 1;
-                if (depth === 2) lastGoodDepth2 = i + 1;
-              }
-            }
 
-            let truncated: string;
-            // Prefer recovering as much of quickReference as possible (depth 2)
-            if (lastGoodDepth2 > lastGoodDepth1) {
-              truncated =
-                sanitized.slice(0, lastGoodDepth2).trimEnd().replace(/,$/, "") +
-                "}}";
-            } else {
-              truncated =
-                sanitized.slice(0, lastGoodDepth1).trimEnd().replace(/,$/, "") +
-                "}}";
-            }
-            generated = JSON.parse(truncated);
-          } catch (e2) {
-            console.error(
-              "[Summary] Failed to parse AI response:",
-              jsonText.slice(0, 800),
-              e2,
-            );
-            return NextResponse.json(
-              { error: "AI returned invalid JSON — please try again" },
-              { status: 500 },
-            );
-          }
-        }
+      try {
+        const model = createAIClient(
+          "gemini-2.5-flash-lite",
+          0.3,
+          userSettings,
+          true,
+        );
+        const response = await model.invoke([
+          systemMsg,
+          new HumanMessage(prompt),
+        ]);
+        generated = parseGeneratedSummary(response.content.toString());
+      } catch (providerError) {
+        console.warn(
+          "[Summary] Provider generation failed, using local Ollama fallback:",
+          providerError instanceof Error
+            ? providerError.message
+            : providerError,
+        );
+        const localPrompt = `${systemMsg.content}\n\n${prompt}`;
+        generated = parseGeneratedSummary(
+          await invokeLocalOllama(localPrompt, {
+            temperature: 0.2,
+            numPredict: 4096,
+          }),
+        );
       }
 
       const saved = await SpaceSummaryModel.findOneAndUpdate(

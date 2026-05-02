@@ -16,6 +16,7 @@ import { Annotation } from "@langchain/langgraph";
 import { retrieve } from "./retriever";
 import { correctContext } from "./corrector";
 import { generateAnswer } from "./generator";
+import type { HistoryTurn } from "./generator";
 import type { RetrievedDoc } from "./retriever";
 import type { APISettings } from "@/lib/types";
 
@@ -46,6 +47,10 @@ const CRAGState = Annotation.Root({
   answer: Annotation<string>({
     value: (_prev, next) => next,
     default: () => "",
+  }),
+  history: Annotation<HistoryTurn[]>({
+    value: (_prev, next) => next,
+    default: () => [] as HistoryTurn[],
   }),
 });
 
@@ -82,6 +87,7 @@ async function nodeGenerate(
     state.query,
     state.corrected,
     state.userSettings,
+    state.history,
   );
   return { answer };
 }
@@ -112,11 +118,20 @@ const cragGraph = workflow.compile();
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+export interface Citation {
+  idx: number;
+  title: string;
+  url: string;
+  snippet: string;
+  contentId?: string;
+}
+
 export interface RAGResult {
   answer: string;
   confidence: number;
   usedWebSearch: boolean;
   sources: string[];
+  citations: Citation[];
 }
 
 /**
@@ -125,19 +140,40 @@ export interface RAGResult {
  * @param query   - The student's question
  * @param spaceId - MongoDB ObjectId of the learning space
  * @param userId  - MongoDB ObjectId of the user
+ * @param history - Recent conversation turns for context
  */
 export async function ragQuery(
   query: string,
   spaceId: string,
   userId: string,
   userSettings?: APISettings,
+  history: HistoryTurn[] = [],
 ): Promise<RAGResult> {
   const finalState = await cragGraph.invoke({
     query,
     spaceId,
     userId,
     userSettings,
+    history,
   });
+
+  // Build deduplicated citations (one per unique source document)
+  const seen = new Set<string>();
+  const citations: Citation[] = [];
+  for (const doc of finalState.corrected as RetrievedDoc[]) {
+    const key = doc.title ?? "";
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    if (doc.source === "space" && doc.url) {
+      citations.push({
+        idx: citations.length + 1,
+        title: doc.title ?? "Source",
+        url: doc.url,
+        snippet: doc.text.slice(0, 200),
+        contentId: doc.contentId,
+      });
+    }
+  }
 
   return {
     answer: finalState.answer,
@@ -146,5 +182,6 @@ export async function ragQuery(
     sources: finalState.corrected.map((d: RetrievedDoc) =>
       d.text.slice(0, 200),
     ),
+    citations,
   };
 }

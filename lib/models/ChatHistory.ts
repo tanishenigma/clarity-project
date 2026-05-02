@@ -1,9 +1,18 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
+export interface ICitationRecord {
+  idx: number;
+  title: string;
+  url: string;
+  snippet: string;
+  contentId?: string;
+}
+
 export interface IChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp?: Date;
+  citations?: ICitationRecord[];
 }
 
 export interface IChatHistory extends Document {
@@ -28,6 +37,15 @@ const ChatHistorySchema = new Schema<IChatHistory>(
         role: { type: String, enum: ["user", "assistant"], required: true },
         content: { type: String, required: true },
         timestamp: { type: Date, default: Date.now },
+        citations: [
+          {
+            idx: Number,
+            title: String,
+            url: String,
+            snippet: String,
+            contentId: String,
+          },
+        ],
       },
     ],
   },

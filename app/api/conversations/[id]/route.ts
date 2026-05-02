@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
+import { Types } from "mongoose";
 import ConversationModel from "@/lib/models/Conversation";
 import ChatHistoryModel from "@/lib/models/ChatHistory";
 
@@ -31,10 +32,30 @@ export async function GET(
       );
     }
 
-    // Get chat history
+    // Get chat history — cast to ObjectId explicitly so Mongoose query matches
     const chatHistory = await ChatHistoryModel.findOne({
-      conversationId,
+      conversationId: new Types.ObjectId(conversationId),
     }).lean();
+
+    // Explicitly serialize messages so all fields (including citations) survive
+    // the JSON serialization step correctly (no ObjectId/Date surprises).
+    const messages = (chatHistory?.messages ?? []).map((msg: any) => ({
+      role: msg.role,
+      content: msg.content,
+      timestamp: msg.timestamp ? new Date(msg.timestamp).toISOString() : null,
+      toolsUsed: msg.toolsUsed ?? undefined,
+      graphUpdate: msg.graphUpdate ?? undefined,
+      feedbackLog: msg.feedbackLog ?? undefined,
+      citations: Array.isArray(msg.citations)
+        ? msg.citations.map((c: any) => ({
+            idx: c.idx,
+            title: c.title,
+            url: c.url,
+            snippet: c.snippet,
+            contentId: c.contentId,
+          }))
+        : [],
+    }));
 
     return NextResponse.json({
       conversation: {
@@ -43,7 +64,7 @@ export async function GET(
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
       },
-      messages: chatHistory?.messages || [],
+      messages,
     });
   } catch (error) {
     console.error("Error fetching conversation:", error);

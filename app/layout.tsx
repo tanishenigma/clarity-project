@@ -6,6 +6,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { PersonalizationProvider } from "@/lib/personalization-context";
 import { COLOR_THEMES } from "@/lib/color-themes";
 import "@/app/globals.css";
+import "katex/dist/katex.min.css";
 
 const syne = Syne({
   subsets: ["latin"],

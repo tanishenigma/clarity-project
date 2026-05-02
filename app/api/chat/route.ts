@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     };
 
     console.log("Calling handleTutorQuery...");
-    const { response, toolsUsed, graphUpdate, feedbackLog } =
+    const { response, toolsUsed, graphUpdate, feedbackLog, citations } =
       await agent.handleTutorQuery(userQuery, context, images);
 
     console.log("API Response:", {
@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       toolsUsed,
       graphUpdate,
       feedbackLog,
+      citations,
     });
   } catch (error) {
     console.error("Chat error:", error);

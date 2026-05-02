@@ -1,6 +1,5 @@
-transformers
+ollama
 sentence-transformers
 faiss-cpu
-torch
 flask
 numpy

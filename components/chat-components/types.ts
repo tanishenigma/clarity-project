@@ -4,6 +4,14 @@ export interface UploadedFile {
   url?: string;
 }
 
+export interface Citation {
+  idx: number;
+  title: string;
+  url: string;
+  snippet: string;
+  contentId?: string;
+}
+
 export interface GraphExpression {
   id: string;
   latex: string;
@@ -40,6 +48,7 @@ export interface Message {
   toolsUsed?: string[];
   graphUpdate?: GraphUpdate;
   feedbackLog?: string[];
+  citations?: Citation[];
 }
 
 export interface Conversation {

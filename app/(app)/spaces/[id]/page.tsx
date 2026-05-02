@@ -96,7 +96,7 @@ export default function SpaceDetailPage({
     <div
       className={
         activeTab === "chat"
-          ? "flex flex-col flex-1 min-h-0 gap-6"
+          ? "flex h-full flex-col flex-1 min-h-0 overflow-hidden"
           : "space-y-6"
       }>
       {!isStudyMode && (
@@ -156,7 +156,11 @@ export default function SpaceDetailPage({
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
-        className={activeTab === "chat" ? "w-full flex-1 min-h-0" : "w-full"}>
+        className={
+          activeTab === "chat"
+            ? "w-full h-full flex-1 min-h-0 flex flex-col overflow-hidden"
+            : "w-full"
+        }>
         <TabsContent value="content" className="space-y-4">
           <ContentTab content={content} onDelete={handleDeleteContent} />
         </TabsContent>
@@ -215,9 +219,13 @@ export default function SpaceDetailPage({
 
         <TabsContent
           value="chat"
-          className={activeTab === "chat" ? "flex-1 min-h-0" : ""}>
+          className={
+            activeTab === "chat"
+              ? "flex h-full flex-col flex-1 min-h-0 overflow-hidden"
+              : ""
+          }>
           {user ? (
-            <div className="-mx-4 sm:-mx-6 md:-mx-8 -mb-6 md:-mb-8 h-full">
+            <div className="-mx-4 sm:-mx-6 md:-mx-8 flex h-full flex-col flex-1 min-h-0 overflow-hidden">
               <TutorChat
                 spaceId={id}
                 userId={user.id}

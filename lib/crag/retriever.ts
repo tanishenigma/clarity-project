@@ -118,6 +118,8 @@ export interface RetrievedDoc {
   source: "space" | "web";
   score: number;
   title?: string;
+  url?: string;
+  contentId?: string;
 }
 
 // ── Main retriever ────────────────────────────────────────────────────────────
@@ -162,7 +164,12 @@ export async function retrieve(
     const queryVec = buildTfVector(tokenize(query));
 
     // Build chunks from each content item
-    const allChunks: Array<{ text: string; title: string }> = [];
+    const allChunks: Array<{
+      text: string;
+      title: string;
+      url: string;
+      contentId: string;
+    }> = [];
 
     for (const item of items as any[]) {
       let chunks: string[] = [];
@@ -222,7 +229,12 @@ export async function retrieve(
       }
 
       for (const chunk of chunks) {
-        allChunks.push({ text: chunk, title: item.title ?? "Untitled" });
+        allChunks.push({
+          text: chunk,
+          title: item.title ?? "Untitled",
+          url: item.source?.url ?? "",
+          contentId: String(item._id),
+        });
       }
     }
 
@@ -230,12 +242,16 @@ export async function retrieve(
 
     if (allChunks.length === 0) return [];
 
-    const scored: RetrievedDoc[] = allChunks.map(({ text, title }) => ({
-      text,
-      source: "space" as const,
-      score: cosineSimilarity(queryVec, buildTfVector(tokenize(text))),
-      title,
-    }));
+    const scored: RetrievedDoc[] = allChunks.map(
+      ({ text, title, url, contentId }) => ({
+        text,
+        source: "space" as const,
+        score: cosineSimilarity(queryVec, buildTfVector(tokenize(text))),
+        title,
+        url,
+        contentId,
+      }),
+    );
 
     return scored.sort((a, b) => b.score - a.score).slice(0, k);
   } catch (err) {

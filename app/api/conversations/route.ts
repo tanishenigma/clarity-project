@@ -139,27 +139,69 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get("conversationId");
+    const userId = searchParams.get("userId");
+    const spaceId = searchParams.get("spaceId");
 
-    if (!conversationId) {
+    if (!conversationId && (!userId || !spaceId)) {
       return NextResponse.json(
-        { error: "Missing conversationId" },
+        { error: "Missing conversationId or userId/spaceId" },
         { status: 400 },
       );
     }
 
     await connectDB();
 
-    // Delete the conversation
-    await ConversationModel.deleteOne({
-      _id: conversationId,
+    if (conversationId) {
+      // Delete the conversation
+      await ConversationModel.deleteOne({
+        _id: conversationId,
+      });
+
+      // Delete associated chat history
+      await ChatHistoryModel.deleteMany({
+        conversationId,
+      });
+
+      return NextResponse.json({ message: "Conversation deleted" });
+    }
+
+    if (!userId || !spaceId) {
+      return NextResponse.json(
+        { error: "Missing userId or spaceId" },
+        { status: 400 },
+      );
+    }
+
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(spaceId)) {
+      return NextResponse.json(
+        { error: "Invalid userId or spaceId" },
+        { status: 400 },
+      );
+    }
+
+    const scopedUserId = new Types.ObjectId(userId);
+    const scopedSpaceId = new Types.ObjectId(spaceId);
+
+    const conversationIds = await ConversationModel.find({
+      userId: scopedUserId,
+      spaceId: scopedSpaceId,
+    }).distinct("_id");
+
+    if (conversationIds.length > 0) {
+      await ChatHistoryModel.deleteMany({
+        conversationId: { $in: conversationIds },
+      });
+    }
+
+    const { deletedCount = 0 } = await ConversationModel.deleteMany({
+      userId: scopedUserId,
+      spaceId: scopedSpaceId,
     });
 
-    // Delete associated chat history
-    await ChatHistoryModel.deleteMany({
-      conversationId,
+    return NextResponse.json({
+      message: "Conversations cleared",
+      deletedCount,
     });
-
-    return NextResponse.json({ message: "Conversation deleted" });
   } catch (error) {
     console.error("Error deleting conversation:", error);
     return NextResponse.json(

@@ -6,6 +6,7 @@ import { EmptyState } from "./EmptyState";
 import { GraphViewer } from "@/components/chat-components/GraphViewer";
 import { FeedbackLog } from "@/components/chat-components/FeedbackLog";
 import { Message } from "../chat-components/types";
+import type { Citation } from "../chat-components/types";
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -18,9 +19,11 @@ interface ChatMessagesProps {
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
   isSidebarOpen?: boolean;
-  setInput: (value: string) => void; // Fixed: should be a function
-  focusInput: () => void; // Fixed: should be a function
+  setInput: (value: string) => void;
+  focusInput: () => void;
   onQuote?: (text: string) => void;
+  onCitationClick?: (citation: Citation) => void;
+  onStudyPromptSubmit?: (reply: string) => void;
 }
 
 export function ChatMessages({
@@ -36,24 +39,17 @@ export function ChatMessages({
   setInput,
   focusInput,
   onQuote,
+  onCitationClick,
+  onStudyPromptSubmit,
 }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dragContainerRef = useRef<HTMLDivElement>(null);
-  const savedRangeRef = useRef<Range | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [selectionData, setSelectionData] = useState<{
     text: string;
     x: number;
     y: number;
   } | null>(null);
-  const [highlightRects, setHighlightRects] = useState<
-    {
-      left: number;
-      top: number;
-      width: number;
-      height: number;
-    }[]
-  >([]);
 
   const toggleCollapsed = (id: string) => {
     setCollapsedIds((prev) => {
@@ -68,46 +64,71 @@ export function ChatMessages({
     messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
   }, [messages]);
 
-  const handleMouseUp = () => {
-    const selection = window.getSelection();
-    const text = selection?.toString().trim();
-
-    if (text && text.length > 0) {
-      const range = selection?.getRangeAt(0);
-      const boundingRect = range?.getBoundingClientRect();
-      if (boundingRect && range) {
-        const container = dragContainerRef.current;
-        const containerRect = container?.getBoundingClientRect();
-        const scrollTop = container?.scrollTop ?? 0;
-        const scrollLeft = container?.scrollLeft ?? 0;
-
-        // Convert every line rect from viewport-fixed to scroll-container-absolute
-        const rects = Array.from(range.getClientRects()).map((r) => ({
-          left: r.left - (containerRect?.left ?? 0) + scrollLeft,
-          top: r.top - (containerRect?.top ?? 0) + scrollTop,
-          width: r.width,
-          height: r.height,
-        }));
-
-        savedRangeRef.current = range.cloneRange();
-        setHighlightRects(rects);
-        setSelectionData({
-          text,
-          // Also convert button anchor to container-absolute
-          x:
-            boundingRect.left +
-            boundingRect.width / 2 -
-            (containerRect?.left ?? 0) +
-            scrollLeft,
-          y: boundingRect.top - (containerRect?.top ?? 0) + scrollTop,
-        });
-        selection?.removeAllRanges();
+  // Dismiss Ask AI button when clicking elsewhere
+  useEffect(() => {
+    if (!selectionData) return;
+    const dismiss = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (!target.closest("[data-ask-ai-button]")) {
+        setSelectionData(null);
       }
-    } else {
-      savedRangeRef.current = null;
-      setHighlightRects([]);
-      setSelectionData(null);
-    }
+    };
+    document.addEventListener("mousedown", dismiss);
+    return () => document.removeEventListener("mousedown", dismiss);
+  }, [selectionData]);
+
+  // Use document-level mouseup so it fires even when the mouse is released
+  // outside the scroll container (common with scrollable overflow parents).
+  useEffect(() => {
+    const handleMouseUp = () => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+
+      if (!text || text.length === 0) {
+        setSelectionData(null);
+        return;
+      }
+
+      const range = selection?.getRangeAt(0);
+      if (!range) {
+        setSelectionData(null);
+        return;
+      }
+
+      // Only show Ask AI when selection is inside an assistant message
+      let node: Node | null = range.commonAncestorContainer;
+      let inAssistant = false;
+      while (node) {
+        if (
+          node instanceof Element &&
+          node.hasAttribute("data-assistant-content")
+        ) {
+          inAssistant = true;
+          break;
+        }
+        node = node.parentNode;
+      }
+
+      if (!inAssistant) {
+        setSelectionData(null);
+        return;
+      }
+
+      // Position button above the selection using viewport-fixed coords
+      const rect = range.getBoundingClientRect();
+      setSelectionData({
+        text,
+        x: rect.left + rect.width / 2,
+        y: rect.top,
+      });
+    };
+
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => document.removeEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  const handleMouseUp = () => {
+    /* handled by document listener above */
   };
 
   const handleAskAI = (e: React.MouseEvent) => {
@@ -120,9 +141,7 @@ export function ChatMessages({
         setInput(`"${selectionData.text}" `);
       }
 
-      savedRangeRef.current = null;
       window.getSelection()?.removeAllRanges();
-      setHighlightRects([]);
       setSelectionData(null);
       focusInput();
     }
@@ -137,28 +156,15 @@ export function ChatMessages({
       onDrop={onDrop}
       onMouseUp={handleMouseUp}
       className="relative flex-1 overflow-y-auto min-h-0">
-      {/* Custom selection highlight overlay — absolute so it scrolls with content */}
-      {highlightRects.map((rect, i) => (
-        <div
-          key={i}
-          className="absolute pointer-events-none z-40 bg-primary/25 rounded-sm"
-          style={{
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-          }}
-        />
-      ))}
-      {/* Floating Selection Menu — absolute so it scrolls with the text */}
+      {/* Ask AI floating button — fixed to viewport so it doesn't shift on scroll */}
       {selectionData && (
         <div
-          onMouseUp={(e) => e.stopPropagation()}
+          data-ask-ai-button
           onMouseDown={(e) => e.preventDefault()}
-          className="absolute z-50 -translate-x-1/2 -translate-y-full animate-in fade-in zoom-in-95 duration-200"
+          className="fixed z-50 -translate-x-1/2 -translate-y-full animate-in fade-in zoom-in-95 duration-200"
           style={{ left: selectionData.x, top: selectionData.y - 8 }}>
           <button
-            onMouseDown={(e) => e.preventDefault()} // belt-and-suspenders: keep selection alive
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleAskAI}
             className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-xl hover:bg-primary/90 transition-all border border-primary-foreground/10">
             <Quote className="h-4 w-4" />
@@ -183,6 +189,11 @@ export function ChatMessages({
                   }
                   isCollapsed={collapsedIds.has(msg.id)}
                   onToggleCollapse={() => toggleCollapsed(msg.id)}
+                  onCitationClick={onCitationClick}
+                  onStudyPromptSubmit={onStudyPromptSubmit}
+                  canInteractWithStudyPrompt={
+                    isLastMessage && !isTyping && !isGeneratingGraph
+                  }
                 />
 
                 {/* Show graph if available — hidden when message is collapsed */}

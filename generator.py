@@ -3,23 +3,14 @@ import os
 import re
 from collections import Counter
 
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+import ollama
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "Model", "T5_FineTuned")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
+OLLAMA_HOST  = os.environ.get("OLLAMA_HOST",  "http://localhost:11434")
 
-tokenizer = T5Tokenizer.from_pretrained(MODEL_PATH)
-
-model = T5ForConditionalGeneration.from_pretrained(
-    MODEL_PATH,
-    use_safetensors=True,
-)
-
-# T5-Large has a hard positional limit of 512 tokens.
-# Reserve ~80 tokens for the query + prefix, leaving ~430 for context.
-MAX_INPUT_TOKENS = 512
-QUERY_TOKEN_BUDGET = 80
-CONTEXT_TOKEN_BUDGET = MAX_INPUT_TOKENS - QUERY_TOKEN_BUDGET
+# Qwen2.5:4b has a 32k-token context window.
+# We budget generously but stay well under the limit.
+CONTEXT_CHAR_LIMIT = 12_000  # ~3 k tokens of context headroom
 
 
 # ── BM25-lite scoring ─────────────────────────────────────────────────────────
@@ -61,69 +52,59 @@ def _rank_docs(query: str, docs: list[str]) -> list[str]:
 
 def _pack_context(query: str, docs: list[str]) -> str:
     """
-    Tokenize each doc and greedily pack the most relevant ones into the
-    available context budget so nothing gets silently truncated mid-sentence.
+    Rank docs by BM25 relevance then greedily pack them up to CONTEXT_CHAR_LIMIT
+    characters so Qwen's context window is never exceeded.
     """
     ranked = _rank_docs(query, docs)
-
-    packed_tokens = []
-    sep = " | "
-    sep_ids = tokenizer.encode(sep, add_special_tokens=False)
+    sep = "\n---\n"
+    packed: list[str] = []
+    total = 0
 
     for doc in ranked:
-        doc_ids = tokenizer.encode(doc.strip(), add_special_tokens=False)
-        needed = len(doc_ids) + (len(sep_ids) if packed_tokens else 0)
-        if len(packed_tokens) + needed <= CONTEXT_TOKEN_BUDGET:
-            if packed_tokens:
-                packed_tokens.extend(sep_ids)
-            packed_tokens.extend(doc_ids)
+        doc = doc.strip()
+        chunk = (sep + doc) if packed else doc
+        if total + len(chunk) <= CONTEXT_CHAR_LIMIT:
+            packed.append(doc)
+            total += len(chunk)
         else:
-            # Try to fit a truncated version of this doc
-            remaining = CONTEXT_TOKEN_BUDGET - len(packed_tokens)
-            if remaining > 30:
-                if packed_tokens:
-                    remaining -= len(sep_ids)
-                    packed_tokens.extend(sep_ids)
-                packed_tokens.extend(doc_ids[:remaining])
+            # Fit a truncated tail of the doc if there is room
+            remaining = CONTEXT_CHAR_LIMIT - total - len(sep)
+            if remaining > 120:
+                packed.append(doc[:remaining])
             break
 
-    return tokenizer.decode(packed_tokens, skip_special_tokens=True)
+    return sep.join(packed)
 
 
 def generate_answer(query: str, context: list[str]) -> str:
     if not context:
-        print("[T5 Generator] No context docs provided — generating from query only")
+        print("[Ollama Generator] No context docs provided — generating from query only")
         context_str = ""
     else:
         context_str = _pack_context(query, context)
-        print(f"[T5 Generator] Packed {len(context)} docs into context "
-              f"({len(tokenizer.encode(context_str))} tokens)")
+        print(f"[Ollama Generator] Packed {len(context)} docs into context "
+              f"({len(context_str)} chars)")
 
-    input_text = f"question: {query} context: {context_str}"
-
-    # Encode without automatic truncation so we can log a warning if needed
-    inputs = tokenizer(
-        input_text,
-        return_tensors="pt",
-        truncation=True,
-        max_length=MAX_INPUT_TOKENS,
-    )
-    input_len = inputs["input_ids"].shape[1]
-    if input_len >= MAX_INPUT_TOKENS:
-        print(f"[T5 Generator] WARNING: input hit max token limit ({MAX_INPUT_TOKENS}), "
-              "context may still be truncated — consider shorter docs")
+    if context_str:
+        prompt = (
+            "You are a helpful assistant. Use ONLY the context below to answer "
+            "the question. If the context does not contain enough information, "
+            "say so clearly.\n\n"
+            f"Context:\n{context_str}\n\n"
+            f"Question: {query}\n\nAnswer:"
+        )
     else:
-        print(f"[T5 Generator] Input length: {input_len} / {MAX_INPUT_TOKENS} tokens")
+        prompt = f"Answer the following question concisely.\n\nQuestion: {query}\n\nAnswer:"
 
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=256,       # cap *new* tokens, not total length
-        num_beams=4,
-        no_repeat_ngram_size=3,   # prevents repetitive loops
-        length_penalty=1.2,       # slightly favour longer, more complete answers
-        early_stopping=True,
+    print(f"[Ollama Generator] Sending prompt to {OLLAMA_MODEL} via {OLLAMA_HOST}")
+
+    client = ollama.Client(host=OLLAMA_HOST)
+    response = client.generate(
+        model=OLLAMA_MODEL,
+        prompt=prompt,
+        options={"temperature": 0.2, "num_predict": 512},
     )
 
-    answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    print(f"[T5 Generator] Raw output: {answer!r}")
+    answer = response["response"].strip()
+    print(f"[Ollama Generator] Raw output: {answer!r}")
     return answer

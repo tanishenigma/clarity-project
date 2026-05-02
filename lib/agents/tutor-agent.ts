@@ -9,6 +9,7 @@ import { connectDB } from "../db";
 import { Types } from "mongoose";
 import { ContentModel, ChatHistoryModel, ConversationModel } from "../models";
 import { ragQuery } from "../crag";
+import type { Citation } from "../crag";
 // Import the functional factory for the Desmos manager
 import { createDynamicDesmosManager } from "./desmos-graph-manager";
 import {
@@ -16,6 +17,11 @@ import {
   buildPersonalizationPrompt,
 } from "../services/chatbot-personalization";
 import { parseAIJson } from "../utils/parse-ai-json";
+import {
+  generateFlashcardsForSpace,
+  generateQuizForSpace,
+  type StudyDifficulty,
+} from "../services/study-generation";
 
 export interface TutorContext {
   spaceId: string;
@@ -39,6 +45,10 @@ export function createAITutorAgent(
   userSettings?: APISettings,
   personalization?: ChatbotPersonalization | null,
 ) {
+  const FLASHCARD_PROMPT_PREFIX =
+    "I can generate flashcards for this study space.";
+  const QUIZ_PROMPT_PREFIX = "I can generate a quiz for this study space.";
+
   // --- Private State ---
   const model = new AIClient(
     process.env.AI_MODEL || "gemini-2.5-flash-lite",
@@ -278,6 +288,195 @@ Return JSON:
     return { toolsUsed, toolResults, visualizations, graphData, visionContext };
   };
 
+  const persistConversationTurn = async ({
+    context,
+    userQuery,
+    assistantContent,
+    toolsUsed = [],
+    visualizations,
+    citations = [],
+  }: {
+    context: TutorContext;
+    userQuery: string;
+    assistantContent: string;
+    toolsUsed?: string[];
+    visualizations?: any[];
+    citations?: Citation[];
+  }) => {
+    await ChatHistoryModel.updateOne(
+      { conversationId: new Types.ObjectId(context.conversationId) },
+      {
+        $push: {
+          messages: {
+            $each: [
+              { role: "user", content: userQuery, timestamp: new Date() },
+              {
+                role: "assistant",
+                content: assistantContent,
+                timestamp: new Date(),
+                toolsUsed,
+                visualizations,
+                citations,
+              },
+            ],
+          },
+        },
+        $addToSet: {
+          relatedContentIds: { $each: [] },
+        },
+        $set: {
+          userId: new Types.ObjectId(context.userId),
+          spaceId: new Types.ObjectId(context.spaceId),
+          updatedAt: new Date(),
+        },
+      } as any,
+      { upsert: true, strict: false },
+    );
+  };
+
+  const detectStudyGenerationIntent = (
+    query: string,
+  ): "flashcards" | "quiz" | null => {
+    if (
+      /\b(generate|create|make|build)\b.*\b(flashcards?|flash cards?|review cards?)\b|\b(flashcards?|flash cards?|review cards?)\b.*\b(generate|create|make|build)\b/i.test(
+        query,
+      )
+    ) {
+      return "flashcards";
+    }
+
+    if (
+      /\b(generate|create|make|build)\b.*\b(quiz|quizzes|test|practice questions?)\b|\b(quiz|quizzes|test|practice questions?)\b.*\b(generate|create|make|build)\b/i.test(
+        query,
+      )
+    ) {
+      return "quiz";
+    }
+
+    return null;
+  };
+
+  const extractDifficulty = (query: string): StudyDifficulty | null => {
+    const lower = query.toLowerCase();
+    if (lower.includes("easy")) return "easy";
+    if (lower.includes("medium")) return "medium";
+    if (lower.includes("hard")) return "hard";
+    return null;
+  };
+
+  const extractCount = (query: string): number | null => {
+    const match = query.match(/\b([1-9]|[1-4][0-9]|50)\b/);
+    if (!match) return null;
+    const count = Number.parseInt(match[1], 10);
+    return Number.isFinite(count) ? count : null;
+  };
+
+  const getPendingStudyIntent = (
+    history: TutorContext["conversationHistory"],
+  ): "flashcards" | "quiz" | null => {
+    const lastAssistant = [...history]
+      .reverse()
+      .find((message) => message.role === "assistant")?.content;
+
+    if (!lastAssistant) return null;
+    if (lastAssistant.startsWith(FLASHCARD_PROMPT_PREFIX)) return "flashcards";
+    if (lastAssistant.startsWith(QUIZ_PROMPT_PREFIX)) return "quiz";
+    return null;
+  };
+
+  const buildStudyFollowUpPrompt = (
+    tool: "flashcards" | "quiz",
+    count: number | null,
+    difficulty: StudyDifficulty | null,
+  ) => {
+    const thing = tool === "flashcards" ? "flashcards" : "questions";
+    const prefix =
+      tool === "flashcards" ? FLASHCARD_PROMPT_PREFIX : QUIZ_PROMPT_PREFIX;
+
+    if (count == null && difficulty == null) {
+      return `${prefix} Tell me how many ${thing} you want and the difficulty (easy, medium, or hard). Example: "10 ${tool === "flashcards" ? "medium flashcards" : "medium quiz questions"}".`;
+    }
+
+    if (count == null) {
+      return `${prefix} I have the difficulty set to ${difficulty}. How many ${thing} should I generate?`;
+    }
+
+    return `${prefix} I have the count set to ${count}. What difficulty should I use: easy, medium, or hard?`;
+  };
+
+  const maybeHandleStudyToolGeneration = async (
+    userQuery: string,
+    context: TutorContext,
+  ) => {
+    const directIntent = detectStudyGenerationIntent(userQuery);
+    const pendingIntent = getPendingStudyIntent(context.conversationHistory);
+    const count = extractCount(userQuery);
+    const difficulty = extractDifficulty(userQuery);
+    const looksLikePreferenceReply = count !== null || difficulty !== null;
+
+    const intent =
+      directIntent ??
+      (pendingIntent && looksLikePreferenceReply ? pendingIntent : null);
+
+    if (!intent) return null;
+
+    if (count == null || difficulty == null) {
+      const followUp = buildStudyFollowUpPrompt(intent, count, difficulty);
+      await persistConversationTurn({
+        context,
+        userQuery,
+        assistantContent: followUp,
+      });
+      return {
+        response: followUp,
+        toolsUsed: [],
+        citations: [] as Citation[],
+      };
+    }
+
+    if (intent === "flashcards") {
+      const result = await generateFlashcardsForSpace({
+        spaceId: context.spaceId,
+        userId: context.userId,
+        numCards: count,
+        difficulty,
+      });
+
+      const assistantContent = `Generated ${result.inserted} ${difficulty} flashcard${result.inserted === 1 ? "" : "s"} for this study space. Open the Flashcards tab to review them.`;
+      await persistConversationTurn({
+        context,
+        userQuery,
+        assistantContent,
+        toolsUsed: ["generate_flashcards"],
+      });
+      return {
+        response: assistantContent,
+        toolsUsed: ["generate_flashcards"],
+        citations: [] as Citation[],
+      };
+    }
+
+    const result = await generateQuizForSpace({
+      spaceId: context.spaceId,
+      userId: context.userId,
+      numQuestions: count,
+      difficulty,
+    });
+
+    const assistantContent = `Generated a ${difficulty} quiz with ${count} question${count === 1 ? "" : "s"} for this study space. Open the Quizzes tab to start it.`;
+    await persistConversationTurn({
+      context,
+      userQuery,
+      assistantContent,
+      toolsUsed: ["generate_quiz"],
+    });
+    return {
+      response: assistantContent,
+      toolsUsed: ["generate_quiz"],
+      citations: [] as Citation[],
+    };
+  };
+
   // --- Public API Functions ---
 
   /**
@@ -293,8 +492,17 @@ Return JSON:
     visualizations?: any[];
     graphUpdate?: any;
     feedbackLog?: string[];
+    citations?: Citation[];
   }> => {
     await connectDB();
+
+    const studyToolResult = await maybeHandleStudyToolGeneration(
+      userQuery,
+      context,
+    );
+    if (studyToolResult) {
+      return studyToolResult;
+    }
 
     // Steps 1–3: Corrective RAG pipeline (retrieve → correct → generate via T5 Large)
     const cragResult = await ragQuery(
@@ -302,9 +510,11 @@ Return JSON:
       context.spaceId,
       context.userId,
       userSettings,
+      context.conversationHistory ?? [],
     );
     const tutorResponse = cragResult.answer;
     const ragContext = cragResult.sources.join("\n\n").substring(0, 3000);
+    const citations = cragResult.citations;
 
     // Step 4: Orchestrate all tools and agents, passing the AI response so the
     // graph agent knows exactly what to visualize.
@@ -318,34 +528,14 @@ Return JSON:
       );
 
     // Step 5: Save conversation (Append to existing history)
-    await ChatHistoryModel.updateOne(
-      { conversationId: new Types.ObjectId(context.conversationId) },
-      {
-        $push: {
-          messages: {
-            $each: [
-              { role: "user", content: userQuery, timestamp: new Date() },
-              {
-                role: "assistant",
-                content: tutorResponse,
-                timestamp: new Date(),
-                toolsUsed,
-                visualizations,
-              },
-            ],
-          },
-        },
-        $addToSet: {
-          relatedContentIds: { $each: [] },
-        },
-        $set: {
-          userId: new Types.ObjectId(context.userId),
-          spaceId: new Types.ObjectId(context.spaceId),
-          updatedAt: new Date(),
-        },
-      } as any,
-      { upsert: true },
-    );
+    await persistConversationTurn({
+      context,
+      userQuery,
+      assistantContent: tutorResponse,
+      toolsUsed,
+      visualizations,
+      citations,
+    });
 
     return {
       response: tutorResponse,
@@ -353,6 +543,7 @@ Return JSON:
       visualizations,
       graphUpdate: graphData?.finalGraph,
       feedbackLog: graphData?.conversationLog,
+      citations,
     };
   };
 

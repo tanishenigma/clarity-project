@@ -1,9 +1,9 @@
 /**
  * CRAG Generator — mirrors generator.py
  *
- * Calls the Python Flask microservice (app.py) which loads the fine-tuned
- * T5 Large model to generate an answer given the corrected context documents.
- * The raw T5 output is then polished by the configured LLM (Gemini/Groq/Euri)
+ * Calls the Python Flask microservice (app.py) which uses Ollama (qwen2.5:3b)
+ * to generate an answer given the corrected context documents.
+ * The raw answer is then polished by the configured LLM (Gemini/Groq/Euri)
  * into clean, LaTeX-formatted markdown.
  *
  * Run Flask before starting the dev server: `npm run flask` or `python app.py`
@@ -20,18 +20,38 @@ export interface GeneratorResult {
   answer: string;
 }
 
+export interface HistoryTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 /**
- * Use the configured LLM to rewrite the raw T5 output into clean
+ * Use the configured LLM to rewrite the raw Ollama output into clean
  * LaTeX-formatted markdown that is accurate to the source context.
+ * Includes prior conversation turns so the model has context.
  */
 async function polishWithLLM(
   query: string,
   rawAnswer: string,
   context: string,
+  history: HistoryTurn[],
   userSettings?: APISettings,
 ): Promise<string> {
   try {
     const client = new AIClient(undefined, 0.3, userSettings);
+
+    // Build a compact history block (last 6 turns to stay within context)
+    const recentHistory = history.slice(-6);
+    const historyBlock =
+      recentHistory.length > 0
+        ? `\nPrevious conversation (for context only — do NOT repeat it):\n${recentHistory
+            .map(
+              (t) =>
+                `${t.role === "user" ? "Student" : "Tutor"}: ${t.content.slice(0, 400)}`,
+            )
+            .join("\n")}\n`
+        : "";
+
     const response = await client.invoke([
       new SystemMessage(
         `You are a study assistant. Your job is to take a raw, compressed answer from a retrieval model and rewrite it as a clear, well-formatted response.
@@ -41,10 +61,12 @@ Rules:
 - Format as clean markdown (headers, bullet points where helpful)
 - Do NOT add information not present in the context or raw answer
 - Do NOT say "Based on the context" or similar — respond directly
-- Keep it concise and educational`,
+- Keep it concise and educational
+- Use the conversation history to understand what has already been explained and avoid repetition`,
       ),
       new HumanMessage(
-        `Student question: ${query}
+        `${historyBlock}
+Student question: ${query}
 
 Retrieved context:
 ${context}
@@ -68,13 +90,14 @@ Rewrite the answer in clean, readable markdown with proper LaTeX formatting:`,
 
 /**
  * POST query + corrected docs to the Flask /api/generate endpoint.
- * The fine-tuned T5 Large model on the Python side produces the final answer,
+ * Ollama (qwen2.5:3b) on the Python side produces the answer,
  * which is then polished by the local LLM into formatted markdown with LaTeX.
  */
 export async function generateAnswer(
   query: string,
   docs: RetrievedDoc[],
   userSettings?: APISettings,
+  history: HistoryTurn[] = [],
 ): Promise<GeneratorResult> {
   const docTexts = docs.map((d) => d.text);
 
@@ -82,7 +105,7 @@ export async function generateAnswer(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, docs: docTexts }),
-    // Generous timeout — T5 generation can be slow on first call (model warmup)
+    // Generous timeout — first Ollama call may be slow (model warmup)
     signal: AbortSignal.timeout(120_000),
   });
 
@@ -94,9 +117,9 @@ export async function generateAnswer(
   const data = (await res.json()) as { answer: string };
   const rawAnswer = data.answer ?? "";
 
-  console.log("[CRAG T5] Raw model output:", rawAnswer);
+  console.log("[CRAG Ollama] Raw model output:", rawAnswer);
   console.log(
-    "[CRAG T5] Using user API key:",
+    "[CRAG Ollama] Using user API key:",
     !!(
       userSettings?.apiKeys?.gemini ||
       userSettings?.apiKeys?.euri ||
@@ -109,7 +132,13 @@ export async function generateAnswer(
 
   // Polish the T5 output with the LLM for clean LaTeX markdown
   const context = docTexts.join("\n\n").substring(0, 3000);
-  const polished = await polishWithLLM(query, rawAnswer, context, userSettings);
+  const polished = await polishWithLLM(
+    query,
+    rawAnswer,
+    context,
+    history,
+    userSettings,
+  );
 
   return { answer: polished };
 }

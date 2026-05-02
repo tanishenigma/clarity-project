@@ -1,10 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/lib/db";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { getUserAPISettings, createAIClient } from "@/lib/ai-client";
-import ContentModel from "@/lib/models/Content";
-import FlashcardModel from "@/lib/models/Flashcard";
-import { parseAIJson } from "@/lib/utils/parse-ai-json";
+import { generateFlashcardsForSpace } from "@/lib/services/study-generation";
 
 // POST - Generate flashcards using AI from space content
 export async function POST(request: NextRequest) {
@@ -19,131 +14,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await connectDB();
-
-    // Get space content
-    const contents = await ContentModel.find({ spaceId }).lean();
-
-    if (contents.length === 0) {
-      return NextResponse.json(
-        { error: "No content in this space to generate flashcards from" },
-        { status: 400 },
-      );
-    }
-
-    // Combine text from all content pieces
-    const combinedText = contents
-      .map((c) => c.processed?.rawText || c.title || "")
-      .join("\n\n")
-      .substring(0, 5000);
-
-    const userSettings = await getUserAPISettings(userId);
-
-    let cards: Array<{ question: string; answer: string; tags?: string[] }>;
-
-    // Try LLM-based generation first; fall back to local T5 via Flask
-    try {
-      const model = createAIClient(
-        "gemini-2.5-flash-lite",
-        0.7,
-        userSettings,
-        true,
-      );
-
-      const difficultyGuide =
-        difficulty === "easy"
-          ? "Focus on definitions and basic facts"
-          : difficulty === "medium"
-            ? "Include concept explanations and relationships between ideas"
-            : "Cover complex analysis, edge cases, and deeper synthesis";
-
-      const prompt = `Generate ${numCards} flashcards (${difficulty} difficulty) based on the following content.
-${difficultyGuide}
-
-For each flashcard, provide a JSON object with:
-- question: A clear, specific question about the concept itself (do NOT reference chapter names, chapter numbers, section titles, or document structure)
-- answer: A concise but complete answer (2-4 sentences max) focused purely on the concept
-- tags: Array of 1-3 relevant topic tags (lowercase)
-
-Do NOT include phrases like "In Chapter 3...", "According to section 2...", "As mentioned in the introduction...", or any other references to document structure. Questions and answers must stand alone as self-contained knowledge.
-
-MATH FORMATTING RULES (strictly follow these):
-- Wrap ALL mathematical expressions, equations, variables, and symbols in LaTeX delimiters.
-- Use $...$ for inline math (e.g. $E = mc^2$, $\\alpha$, $\\sum_{i=1}^n x_i$).
-- Use $$...$$ for standalone/display equations on their own line.
-- Apply this to both the question and the answer — never write raw math without delimiters.
-
-Content:
-${combinedText}
-
-IMPORTANT: Return ONLY a valid JSON array, no markdown formatting, no code blocks. Example format:
-[{"question": "What is $x$ if $2x = 8$?", "answer": "Dividing both sides by 2 gives $x = 4$.", "tags": ["algebra"]}]`;
-
-      const response = await model.invoke([
-        new SystemMessage(
-          "You are a flashcard generation assistant. You MUST respond with ONLY a valid JSON array — no markdown, no code fences, no explanation, no prose before or after. Output raw JSON only.",
-        ),
-        new HumanMessage(prompt),
-      ]);
-      const responseText = response.content.toString();
-      cards = parseAIJson<any[]>(responseText);
-
-      if (!Array.isArray(cards) || cards.length === 0) {
-        throw new Error("AI returned empty flashcard array");
-      }
-    } catch (llmError) {
-      // LLM unavailable (no API keys) — fall back to local T5 via Flask
-      console.warn(
-        "[Flashcards] LLM unavailable, falling back to local T5 Flask service:",
-        llmError instanceof Error ? llmError.message : llmError,
-      );
-
-      const flaskUrl = process.env.CRAG_FLASK_URL ?? "http://localhost:5001";
-      const flaskRes = await fetch(`${flaskUrl}/api/flashcards`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: combinedText, numCards }),
-        signal: AbortSignal.timeout(120_000),
-      });
-
-      if (!flaskRes.ok) {
-        const errText = await flaskRes.text().catch(() => flaskRes.statusText);
-        throw new Error(`Flask flashcard error ${flaskRes.status}: ${errText}`);
-      }
-
-      const flaskData = (await flaskRes.json()) as {
-        flashcards: Array<{ question: string; answer: string }>;
-      };
-      cards = flaskData.flashcards ?? [];
-    }
-
-    // Build flashcard documents
-    const flashcardDocs = cards.map((card: any) => ({
-      spaceId,
-      userId,
-      contentId: null,
-      type: "normal",
-      question: card.question || "",
-      answer: card.answer || "",
-      tags: Array.isArray(card.tags) ? card.tags : [],
-      difficulty: 3,
-      generatedAt: new Date(),
-      reviewStats: {
-        totalReviews: 0,
-        correctCount: 0,
-        lastReviewedAt: null,
-        nextReviewAt: new Date(),
-      },
-    }));
-
-    const inserted = await FlashcardModel.insertMany(flashcardDocs);
-
-    return NextResponse.json({
-      inserted: inserted.length,
-      ids: inserted.map((c) => c._id.toString()),
-    });
+    return NextResponse.json(
+      await generateFlashcardsForSpace({
+        spaceId,
+        userId,
+        numCards,
+        difficulty,
+      }),
+    );
   } catch (error) {
     console.error("Error generating flashcards:", error);
+    if (
+      error instanceof Error &&
+      /No content in this space/i.test(error.message)
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: "Failed to generate flashcards" },
       { status: 500 },

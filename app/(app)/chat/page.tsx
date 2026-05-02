@@ -386,13 +386,13 @@ export default function ChatPage() {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setIsTyping(false);
-      const tokenQueue: string[] = [];
+      const wordQueue: string[] = [];
       let displayedContent = "";
       let graphMarkerSeen = false;
 
       const drainInterval = setInterval(() => {
-        if (tokenQueue.length === 0) return;
-        displayedContent += tokenQueue.shift()!;
+        if (wordQueue.length === 0) return;
+        displayedContent += wordQueue.shift()!;
         setMessages((prev) => {
           const updated = [...prev];
           const lastIdx = updated.map((m) => m.role).lastIndexOf("assistant");
@@ -404,7 +404,7 @@ export default function ChatPage() {
           }
           return updated;
         });
-      }, 25);
+      }, 35);
 
       const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
       while (true) {
@@ -417,13 +417,18 @@ export default function ChatPage() {
         if (!graphMarkerSeen) {
           if (assistantContent.includes("\n__GRAPH__:")) {
             graphMarkerSeen = true;
-            // Only show text up to the graph marker; replace any queued chunks
+            // Only show text up to the graph marker; replace any queued words
             const textPart = assistantContent.split("\n__GRAPH__:")[0];
             const remaining = textPart.slice(displayedContent.length);
-            tokenQueue.length = 0;
-            if (remaining) tokenQueue.push(remaining);
+            wordQueue.length = 0;
+            if (remaining) {
+              const words = remaining.match(/\S+\s*/g) ?? [remaining];
+              wordQueue.push(...words);
+            }
           } else {
-            tokenQueue.push(chunk);
+            // Split chunk into words and push each individually
+            const words = chunk.match(/\S+\s*/g) ?? [chunk];
+            wordQueue.push(...words);
           }
         }
       }
@@ -431,10 +436,10 @@ export default function ChatPage() {
       // Flush remaining decoder bytes
       assistantContent += decoder.decode();
 
-      // Wait for the token queue to fully drain before graph parsing
+      // Wait for the word queue to fully drain before graph parsing
       await new Promise<void>((resolve) => {
         const checkDrain = setInterval(() => {
-          if (tokenQueue.length === 0) {
+          if (wordQueue.length === 0) {
             clearInterval(checkDrain);
             clearInterval(drainInterval);
             resolve();

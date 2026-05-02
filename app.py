@@ -171,7 +171,7 @@ def api_flashcards():
         key_phrase = ' '.join(words[:min(5, len(words))])
 
         # Ask T5 to answer a question about this sentence
-        question_prompt = f"What does this explain: {key_phrase}?"
+        question_prompt = f"{key_phrase}?"
         t5_answer = generate_answer(question_prompt, [sent])
 
         flashcards.append({
