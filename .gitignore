@@ -48,3 +48,4 @@ Model/
 # Python cache
 *.egg-info/
 dist/
+Minor Project/
