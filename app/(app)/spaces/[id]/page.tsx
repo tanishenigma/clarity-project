@@ -93,7 +93,12 @@ export default function SpaceDetailPage({
   const { space, content, flashcards, quizzes, stats } = data;
 
   return (
-    <div className="space-y-6">
+    <div
+      className={
+        activeTab === "chat"
+          ? "flex flex-col flex-1 min-h-0 gap-6"
+          : "space-y-6"
+      }>
       {!isStudyMode && (
         <>
           {/* Header */}
@@ -148,7 +153,10 @@ export default function SpaceDetailPage({
       )}
 
       {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className={activeTab === "chat" ? "w-full flex-1 min-h-0" : "w-full"}>
         <TabsContent value="content" className="space-y-4">
           <ContentTab content={content} onDelete={handleDeleteContent} />
         </TabsContent>
@@ -205,11 +213,11 @@ export default function SpaceDetailPage({
           )}
         </TabsContent>
 
-        <TabsContent value="chat">
+        <TabsContent
+          value="chat"
+          className={activeTab === "chat" ? "flex-1 min-h-0" : ""}>
           {user ? (
-            <div
-              className="-mx-4 sm:-mx-6 md:-mx-8 -mb-6 md:-mb-8 -mt-6 md:mt-0"
-              style={{ height: "calc(100dvh - 56px)" }}>
+            <div className="-mx-4 sm:-mx-6 md:-mx-8 -mb-6 md:-mb-8 h-full">
               <TutorChat
                 spaceId={id}
                 userId={user.id}

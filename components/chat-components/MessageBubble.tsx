@@ -21,7 +21,6 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { Message } from "../chat-components/types";
-import "katex/dist/katex.min.css";
 
 /* ─── Custom Theme ─── */
 const customCodeTheme: any = {

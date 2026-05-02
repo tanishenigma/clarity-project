@@ -554,7 +554,7 @@ export default function ChatPage() {
   const hasMessages = messages.length > 0;
   return (
     <div
-      className="relative flex h-dvh overflow-hidden -mt-24 -mx-4 -mb-6 sm:-mt-12 sm:-mx-6 sm:-mb-6 md:-m-8 pt-12 md:pt-0 bg-linear-to-br from-background via-muted/10 to-background"
+      className="relative flex h-dvh overflow-hidden -mt-24 -mx-4 -mb-6 sm:-mt-16 sm:-mx-6 sm:-mb-6 md:-m-8 pt-12 md:pt-0 bg-linear-to-br from-background via-muted/10 to-background"
       onDragEnter={handleDrag}
       onDragLeave={handleDrag}
       onDragOver={handleDrag}

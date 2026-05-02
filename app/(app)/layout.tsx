@@ -8,8 +8,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <CommandPaletteProvider>
       <div className="flex h-screen">
         <Sidebar />
-        <main className="flex-1 overflow-auto">
-          <div className="p-4 sm:p-6 md:p-8 pt-16 md:pt-8 pb-6 md:pb-8">
+        <main className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-4 sm:p-6 md:p-8 pt-16 md:pt-8 pb-6 md:pb-8">
             {children}
           </div>
         </main>
