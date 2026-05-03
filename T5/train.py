@@ -191,7 +191,7 @@ def train(cfg: TrainConfig):
     logger.info(f"Total optimizer steps: {total_steps} | Warmup steps: {warmup_steps}")
 
     # ── Mixed precision ─────────────────────────
-    scaler = torch.cuda.amp.GradScaler() if (cfg.use_fp16 and device.type == "cuda") else None
+    scaler = torch.amp.GradScaler("cuda") if (cfg.use_fp16 and device.type == "cuda") else None
     if scaler:
         logger.info("Mixed precision (fp16) enabled")
 
@@ -234,7 +234,7 @@ def train(cfg: TrainConfig):
 
             # Forward
             if scaler:
-                with torch.cuda.amp.autocast():
+                with torch.amp.autocast("cuda"):
                     outputs = model(
                         input_ids=input_ids,
                         attention_mask=attention_mask,

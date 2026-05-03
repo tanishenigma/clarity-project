@@ -12,7 +12,7 @@ from typing import Optional
 @dataclass
 class TrainConfig:
     # ── Paths ──────────────────────────────────────────────────────────────
-    data_path: str = "data/questions.jsonl"
+    data_path: str = "C:/Users/admin/clarity-project/pyq_dataset.jsonl"
     # Path to your local .jsonl or .json dataset file.
     # Example: "C:/Users/you/Downloads/juit_questions.jsonl"
 
@@ -23,7 +23,7 @@ class TrainConfig:
     # TensorBoard log directory.
 
     # ── Model ──────────────────────────────────────────────────────────────
-    model_name: str = "google/t5-large"
+    model_name: str = "google-t5/t5-large"
     # Options: "t5-base", "google/t5-large", "google/flan-t5-large"
     # flan-t5-large often works better for instruction-style tasks.
 
@@ -38,13 +38,13 @@ class TrainConfig:
 
     # ── Training hyperparameters ────────────────────────────────────────────
     num_epochs: int = 10
-    train_batch_size: int = 4      # Lower if you hit OOM on your GPU
-    val_batch_size: int = 8
-    gradient_accumulation_steps: int = 4   # Effective batch = 4×4 = 16
-    learning_rate: float = 3e-4
+    train_batch_size: int = 1      # Lower if you hit OOM on your GPU
+    val_batch_size: int = 1
+    gradient_accumulation_steps: int = 16   # Effective batch = 1×16 = 16
+    learning_rate: float = 5e-5
     weight_decay: float = 0.01
-    warmup_ratio: float = 0.1             # 10% of steps for LR warmup
-    max_grad_norm: float = 1.0
+    warmup_ratio: float = 0.15             # 10% of steps for LR warmup
+    max_grad_norm: float = 0.5
 
     # ── Mixed precision ─────────────────────────────────────────────────────
     use_fp16: bool = True
@@ -64,7 +64,7 @@ class TrainConfig:
 
     # ── Reproducibility ─────────────────────────────────────────────────────
     seed: int = 42
-    num_workers: int = 2           # DataLoader workers (set 0 on Windows)
+    num_workers: int = 0           # DataLoader workers (set 0 on Windows)
 
     # ── Checkpoint resume ───────────────────────────────────────────────────
     resume_from_checkpoint: Optional[str] = None

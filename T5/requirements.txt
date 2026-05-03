@@ -1,19 +1,17 @@
 # requirements.txt
 # Install with: pip install -r requirements.txt
+#
+# IMPORTANT: transformers is pinned to 4.44.2
+# transformers 5.x introduced breaking changes — do NOT use it.
 
-# Core ML
-torch>=2.1.0                  # CUDA 11.8+ recommended; install from pytorch.org
-transformers>=4.40.0
-sentencepiece>=0.1.99         # Required by T5Tokenizer
-accelerate>=0.27.0            # Optional: for multi-GPU / DeepSpeed
-
-# Training utilities
+torch>=2.1.0
+transformers==4.44.2
+sentencepiece>=0.1.99
+tokenizers>=0.19.0,<0.20.0
+huggingface-hub>=0.24.0,<0.25.0
+accelerate>=0.27.0
 tqdm>=4.66.0
 tensorboard>=2.15.0
-
-# Data handling
 numpy>=1.26.0
-
-# Optional: evaluation metrics
-# sacrebleu>=2.3.0            # BLEU score for generation quality
-# rouge-score>=0.1.2          # ROUGE score
+requests>=2.31.0
+safetensors>=0.4.3
