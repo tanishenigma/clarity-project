@@ -74,6 +74,12 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
       href: "/study/analytics",
       shortcut: "Y",
     },
+    {
+      label: "Assessment Agent",
+      icon: Sparkles,
+      href: "/assessment-agent",
+      shortcut: "M",
+    },
     { label: "Spaces", icon: Layers2, href: "/spaces", shortcut: "S" },
     { label: "Chat", icon: SquarePen, href: "/chat", shortcut: "C" },
   ];

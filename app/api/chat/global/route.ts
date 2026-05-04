@@ -18,6 +18,7 @@ import {
   getChatbotPersonalization,
   buildPersonalizationPrompt,
 } from "@/lib/services/chatbot-personalization";
+import { invokeLocalOllama } from "@/lib/services/study-generation";
 
 import { utapi } from "@/lib/uploadthing";
 
@@ -86,6 +87,91 @@ async function extractFileContent(
   }
 
   return `[File: ${file.name} (Could not extract content)]`;
+}
+
+function serializeMessageContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") {
+          return part;
+        }
+
+        if (!part || typeof part !== "object") {
+          return "";
+        }
+
+        if (typeof (part as { text?: unknown }).text === "string") {
+          return (part as { text: string }).text;
+        }
+
+        if ((part as { type?: unknown }).type === "image_url") {
+          return "[image attachment omitted]";
+        }
+
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  return String(content ?? "");
+}
+
+function buildLocalChatPrompt(
+  messages: Array<HumanMessage | AIMessage | SystemMessage>,
+  assistantInstruction = "Reply to the latest user message naturally. Do not repeat the role tags.",
+): string {
+  const transcript = messages
+    .map((message) => {
+      const role =
+        message instanceof SystemMessage
+          ? "System"
+          : message instanceof AIMessage
+            ? "Assistant"
+            : "User";
+
+      return `<${role}>\n${serializeMessageContent(message.content)}\n</${role}>`;
+    })
+    .join("\n\n");
+
+  return `${transcript}\n\n<Assistant>\n${assistantInstruction}`;
+}
+
+async function invokeWithOllamaFallback(
+  model: AIClient,
+  messages: Array<HumanMessage | AIMessage | SystemMessage>,
+  options: {
+    assistantInstruction?: string;
+    temperature?: number;
+    numPredict?: number;
+    timeoutMs?: number;
+  } = {},
+): Promise<string> {
+  try {
+    const response = await model.invoke(messages);
+    return serializeMessageContent(response.content).trim();
+  } catch (providerError) {
+    console.warn(
+      "[GlobalChat] Provider invoke failed, trying local Ollama fallback:",
+      providerError instanceof Error ? providerError.message : providerError,
+    );
+
+    return (
+      await invokeLocalOllama(
+        buildLocalChatPrompt(messages, options.assistantInstruction),
+        {
+          temperature: options.temperature ?? 0.35,
+          numPredict: options.numPredict ?? 2048,
+          timeoutMs: options.timeoutMs ?? 90_000,
+        },
+      )
+    ).trim();
+  }
 }
 
 // --- MAIN HANDLER ---
@@ -218,21 +304,27 @@ export async function POST(request: NextRequest) {
       let smartTitle = message?.substring(0, 50) || "New Conversation";
       if (message) {
         try {
-          const titleResponse = await model.invoke([
-            new SystemMessage(
-              "You generate ultra-short conversation titles. Reply with ONLY 3-6 words that capture the essence of the user's request. No punctuation, no quotes, no explanation.",
-            ),
-            new HumanMessage(
-              `User asked: "${message.substring(0, 200)}"
+          const generated = await invokeWithOllamaFallback(
+            model,
+            [
+              new SystemMessage(
+                "You generate ultra-short conversation titles. Reply with ONLY 3-6 words that capture the essence of the user's request. No punctuation, no quotes, no explanation.",
+              ),
+              new HumanMessage(
+                `User asked: "${message.substring(0, 200)}"
 
 Respond with a 3-6 word title only.`,
-            ),
-          ]);
-          const generated =
-            typeof titleResponse.content === "string"
-              ? titleResponse.content.trim().substring(0, 60)
-              : null;
-          if (generated) smartTitle = generated;
+              ),
+            ],
+            {
+              assistantInstruction:
+                "Respond with only a 3-6 word title. No punctuation, no quotes, no explanation.",
+              temperature: 0.2,
+              numPredict: 80,
+            },
+          );
+
+          if (generated) smartTitle = generated.substring(0, 60);
         } catch {
           // fallback to truncated message
         }
@@ -375,17 +467,53 @@ Respond with a 3-6 word title only.`,
       async start(controller) {
         try {
           console.log("Starting stream...");
-          // AIClient.stream() is an async generator that yields string chunks
-          const stream = model.stream(modelMessages);
           let fullResponse = "";
 
-          for await (const chunk of stream) {
-            // chunk is already a string from AIClient
-            fullResponse += chunk;
+          try {
+            // AIClient.stream() is an async generator that yields string chunks
+            const stream = model.stream(modelMessages);
+
+            for await (const chunk of stream) {
+              fullResponse += chunk;
+              try {
+                controller.enqueue(encoder.encode(chunk));
+              } catch (enqueueError: any) {
+                // Controller closed (client disconnected or stream cancelled)
+                if (enqueueError?.code === "ERR_INVALID_STATE") {
+                  console.warn("[Stream] Controller closed, stopping stream.");
+                  return;
+                }
+                throw enqueueError;
+              }
+            }
+          } catch (providerError) {
+            if (fullResponse.length > 0) {
+              throw providerError;
+            }
+
+            console.warn(
+              "[GlobalChat] Provider stream failed, trying local Ollama fallback:",
+              providerError instanceof Error
+                ? providerError.message
+                : providerError,
+            );
+
+            fullResponse = await invokeLocalOllama(
+              buildLocalChatPrompt(modelMessages),
+              {
+                temperature: 0.35,
+                numPredict: 4096,
+                timeoutMs: 90_000,
+              },
+            );
+
+            if (!fullResponse.trim()) {
+              throw providerError;
+            }
+
             try {
-              controller.enqueue(encoder.encode(chunk));
+              controller.enqueue(encoder.encode(fullResponse));
             } catch (enqueueError: any) {
-              // Controller closed (client disconnected or stream cancelled)
               if (enqueueError?.code === "ERR_INVALID_STATE") {
                 console.warn("[Stream] Controller closed, stopping stream.");
                 return;

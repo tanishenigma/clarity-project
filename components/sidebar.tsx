@@ -20,6 +20,7 @@ import {
   Plus,
   NotebookPen,
   MessageCircle,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -145,7 +146,8 @@ export function Sidebar({ spaceId }: SidebarProps) {
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/add-content", icon: Plus, label: "Add Content" },
     { href: "/spaces", icon: Layers2, label: "Spaces" },
-    { href: "/study/analytics", icon: BarChart3, label: "Study Analytics" },
+    { href: "/study/analytics", icon: BarChart3, label: "Analytics" },
+    { href: "/assessment-agent", icon: Sparkles, label: "Assessment" },
     { href: "/chat", icon: MessageCircle, label: "Chat" },
     { href: "/notes", icon: NotebookPen, label: "Notes" },
   ];
