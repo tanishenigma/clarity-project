@@ -17,13 +17,23 @@ The fine-tuned model is saved back to services/ml/models/T5_FineTuned/ when done
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 import torch
-from datasets import load_dataset, Dataset
+from datasets import Dataset, load_dataset
 from torch.utils.data import DataLoader
 from transformers import T5ForConditionalGeneration, T5Tokenizer
+
+
+def get_hf_token() -> str | None:
+    """Return Hugging Face token from common env vars, if present."""
+    return (
+        os.getenv("HF_TOKEN")
+        or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        or os.getenv("HUGGINGFACE_TOKEN")
+    )
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
