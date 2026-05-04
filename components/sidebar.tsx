@@ -20,7 +20,6 @@ import {
   Settings,
   LogOut,
   Plus,
-  StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -148,7 +147,7 @@ export function Sidebar({ spaceId }: SidebarProps) {
     { href: "/spaces", icon: Layers2, label: "Spaces" },
     { href: "/study/analytics", icon: BarChart3, label: "Study Analytics" },
     { href: "/chat", icon: SquarePen, label: "Chat" },
-    { href: "/notes", icon: StickyNote, label: "Notes" },
+    { href: "/notes", icon: Brain, label: "Notes" },
   ];
 
   const toggleSidebar = (e: any) => {
@@ -368,17 +367,6 @@ export function Sidebar({ spaceId }: SidebarProps) {
 
         {/* Footer */}
         <div className="px-4 pb-5 pt-2 border-t border-sidebar-border space-y-2">
-          {/* <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              window.dispatchEvent(new Event("toggle-quick-notes"));
-              setMobileDrawerOpen(false);
-            }}
-            className="w-full justify-start gap-3 group transition-all duration-200 hover:bg-primary/10 rounded-[10px]">
-            <StickyNote className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-all duration-200" />
-            Quick Notes
-          </Button> */}
           {user ? (
             <div onClick={(e) => e.stopPropagation()}>
               <ProfileDropdown />
@@ -504,18 +492,8 @@ export function Sidebar({ spaceId }: SidebarProps) {
             })}
           </nav>
 
-          {/* Quick Notes + Profile footer */}
+          {/* Profile footer */}
           <div className="px-4 pb-4 pt-2 border-sidebar-border space-y-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                window.dispatchEvent(new Event("toggle-quick-notes"))
-              }
-              className="w-full justify-start gap-3 group transition-all duration-200 hover:bg-primary/10 rounded-[10px]">
-              <StickyNote className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:scale-110 transition-all duration-200" />
-              <span className="text-sm">Quick Notes</span>
-            </Button>
             {user ? (
               <ProfileDropdown />
             ) : (
@@ -577,17 +555,8 @@ export function Sidebar({ spaceId }: SidebarProps) {
             })}
           </nav>
 
-          {/* Quick Notes + Profile footer */}
+          {/* Profile footer */}
           <div className="ml-2 px-2 pb-4 pt-2 border-t border-sidebar-border flex flex-col items-center gap-2">
-            <button
-              title="Quick Notes"
-              onClick={() =>
-                window.dispatchEvent(new Event("toggle-quick-notes"))
-              }
-              className="w-10 h-0 flex items-center justify-center rounded-lg text-muted-foreground
-                hover:text-primary hover:bg-primary/10 transition-all duration-200 group">
-              {/* <StickyNote className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" /> */}
-            </button>
             {user ? (
               <ProfileDropdown collapsed />
             ) : (

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Syne } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
@@ -7,12 +6,6 @@ import { PersonalizationProvider } from "@/lib/personalization-context";
 import { COLOR_THEMES } from "@/lib/color-themes";
 import "@/app/globals.css";
 import "katex/dist/katex.min.css";
-
-const syne = Syne({
-  subsets: ["latin"],
-  variable: "--font-syne",
-  display: "swap",
-});
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ||
@@ -104,7 +97,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${syne.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

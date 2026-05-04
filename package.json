@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "npx concurrently -n \"next,flask\" -c \"cyan,yellow\" \"next dev\" \".venv/bin/python app.py\"",
+    "dev": "npx concurrently -n \"next,flask\" -c \"cyan,yellow\" \"next dev --webpack\" \".venv/bin/python app.py\"",
     "flask": ".venv/bin/python app.py",
     "lint": "eslint .",
     "start": "next start"
