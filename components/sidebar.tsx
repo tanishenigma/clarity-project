@@ -20,6 +20,8 @@ import {
   Settings,
   LogOut,
   Plus,
+  NotebookPen,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -146,8 +148,8 @@ export function Sidebar({ spaceId }: SidebarProps) {
     { href: "/add-content", icon: Plus, label: "Add Content" },
     { href: "/spaces", icon: Layers2, label: "Spaces" },
     { href: "/study/analytics", icon: BarChart3, label: "Study Analytics" },
-    { href: "/chat", icon: SquarePen, label: "Chat" },
-    { href: "/notes", icon: Brain, label: "Notes" },
+    { href: "/chat", icon: MessageCircle, label: "Chat" },
+    { href: "/notes", icon: NotebookPen, label: "Notes" },
   ];
 
   const toggleSidebar = (e: any) => {
