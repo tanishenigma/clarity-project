@@ -202,6 +202,9 @@ export async function POST(request: NextRequest) {
     if (action === "me") {
       const user = await getCurrentUser();
       if (!user) {
+        if (request.cookies.get("ai_tutor_jwt")?.value) {
+          await logout();
+        }
         return NextResponse.json({ user: null });
       }
 

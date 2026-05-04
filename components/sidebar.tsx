@@ -8,13 +8,11 @@ import logoDark from "@/public/logo_dark.png";
 import logoSmallLight from "@/public/logo_small_light.svg";
 import logoSmallDark from "@/public/logo_small_dark.svg";
 import {
-  Brain,
   LogIn,
   PanelLeft,
   BarChart3,
   LayoutDashboard,
   Layers2,
-  SquarePen,
   ChevronRight,
   ChevronDown,
   Settings,
@@ -311,18 +309,19 @@ export function Sidebar({ spaceId }: SidebarProps) {
             return (
               <div key={item.href}>
                 <div className={isSpaces ? "flex items-center" : ""}>
-                  <Link
-                    href={item.href}
-                    className={isSpaces ? "flex-1" : "block"}
-                    onClick={() => setMobileDrawerOpen(false)}>
-                    <Button
-                      variant={isActive ? "active" : "ghost"}
-                      className="w-full justify-start gap-3 rounded-[10px]"
-                      size="sm">
+                  <Button
+                    asChild
+                    variant={isActive ? "active" : "ghost"}
+                    className="w-full justify-start gap-3 rounded-[10px]"
+                    size="sm">
+                    <Link
+                      href={item.href}
+                      className={isSpaces ? "flex-1" : "block"}
+                      onClick={() => setMobileDrawerOpen(false)}>
                       <Icon className="w-4 h-4" />
                       {item.label}
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                   {isSpaces && spaces.length > 0 && (
                     <button
                       onClick={() => setSpacesOpen((o) => !o)}
@@ -374,15 +373,16 @@ export function Sidebar({ spaceId }: SidebarProps) {
               <ProfileDropdown />
             </div>
           ) : (
-            <Link href="/auth" onClick={() => setMobileDrawerOpen(false)}>
-              <Button
-                variant="outline"
-                className="w-full gap-2 rounded-[10px]"
-                size="sm">
+            <Button
+              asChild
+              variant="outline"
+              className="w-full gap-2 rounded-[10px]"
+              size="sm">
+              <Link href="/auth" onClick={() => setMobileDrawerOpen(false)}>
                 <LogIn className="w-4 h-4" />
                 Sign In
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           )}
         </div>
       </aside>
@@ -424,17 +424,18 @@ export function Sidebar({ spaceId }: SidebarProps) {
               return (
                 <div key={item.href}>
                   <div className={isSpaces ? "flex items-center" : ""}>
-                    <Link
-                      href={item.href}
-                      className={isSpaces ? "flex-1" : "block"}>
-                      <Button
-                        variant={isActive ? "active" : "ghost"}
-                        className="w-full justify-start gap-3 my-1 rounded-[10px]"
-                        size="sm">
+                    <Button
+                      asChild
+                      variant={isActive ? "active" : "ghost"}
+                      className="w-full justify-start gap-3 my-1 rounded-[10px]"
+                      size="sm">
+                      <Link
+                        href={item.href}
+                        className={isSpaces ? "flex-1" : "block"}>
                         <Icon className="w-4 h-4" />
                         {item.label}
-                      </Button>
-                    </Link>
+                      </Link>
+                    </Button>
                     {isSpaces && spaces.length > 0 && (
                       <button
                         onClick={() => setSpacesOpen((o) => !o)}
@@ -499,15 +500,16 @@ export function Sidebar({ spaceId }: SidebarProps) {
             {user ? (
               <ProfileDropdown />
             ) : (
-              <Link href="/auth">
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 shadow-md rounded-[10px]"
-                  size="sm">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full gap-2 shadow-md rounded-[10px]"
+                size="sm">
+                <Link href="/auth">
                   <LogIn className="w-4 h-4" />
                   Sign In
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             )}
           </div>
         </aside>
@@ -545,14 +547,16 @@ export function Sidebar({ spaceId }: SidebarProps) {
               const isActive = pathname === item.href;
               const Icon = item.icon;
               return (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "active" : "ghost"}
-                    className="w-full justify-center my-1 rounded-[10px]"
-                    size="sm">
+                <Button
+                  key={item.href}
+                  asChild
+                  variant={isActive ? "active" : "ghost"}
+                  className="w-full justify-center my-1 rounded-[10px]"
+                  size="sm">
+                  <Link href={item.href}>
                     <Icon className="w-4 h-4" />
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               );
             })}
           </nav>
@@ -562,14 +566,15 @@ export function Sidebar({ spaceId }: SidebarProps) {
             {user ? (
               <ProfileDropdown collapsed />
             ) : (
-              <Link href="/auth">
-                <Button
-                  variant="outline"
-                  className="w-full justify-center p-2 rounded-[10px]"
-                  size="sm">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full justify-center p-2 rounded-[10px]"
+                size="sm">
+                <Link href="/auth">
                   <LogIn className="w-4 h-4" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             )}
           </div>
         </aside>

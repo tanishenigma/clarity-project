@@ -579,18 +579,6 @@ export function PdfPanel({ url, title, onClose, onAskAI }: PdfPanelProps) {
                             }
                           />
 
-                          {/* Quiz me */}
-                          <PageBtn
-                            icon={<Brain className="h-3 w-3" />}
-                            label="Quiz me"
-                            onClick={() =>
-                              onAskAI(
-                                `[Page ${n} of "${title}"] Create 3 quiz questions based on the content on this page.`,
-                                "quiz",
-                              )
-                            }
-                          />
-
                           {/* Ask about page */}
                           <PageBtn
                             icon={<MessageSquarePlus className="h-3 w-3" />}
@@ -657,30 +645,6 @@ export function PdfPanel({ url, title, onClose, onAskAI }: PdfPanelProps) {
               label="Summarize"
               onClick={() => {
                 onAskAI(`Summarize this: "${popup.text}"`, "summarize");
-                window.getSelection()?.removeAllRanges();
-                setPopup(null);
-              }}
-            />
-            <PopBtn
-              icon={<FlipHorizontal className="h-3 w-3" />}
-              label="Flashcard"
-              onClick={() => {
-                onAskAI(
-                  `Create a flashcard Q&A from: "${popup.text}"`,
-                  "flashcard",
-                );
-                window.getSelection()?.removeAllRanges();
-                setPopup(null);
-              }}
-            />
-            <PopBtn
-              icon={<Brain className="h-3 w-3" />}
-              label="Quiz me"
-              onClick={() => {
-                onAskAI(
-                  `Generate a quiz question from: "${popup.text}"`,
-                  "quiz",
-                );
                 window.getSelection()?.removeAllRanges();
                 setPopup(null);
               }}

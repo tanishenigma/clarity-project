@@ -1,9 +1,21 @@
 import type React from "react";
+import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { CommandPaletteProvider } from "@/components/command-palette-provider";
+import { getCurrentUser } from "@/lib/auth";
 // import { QuickNotes } from "@/components/quick-notes";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/auth");
+  }
+
   return (
     <CommandPaletteProvider>
       <div className="flex h-screen">

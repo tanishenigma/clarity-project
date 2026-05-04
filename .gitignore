@@ -45,6 +45,9 @@ __pycache__/
 # T5 fine-tuned model weights (large binary files)
 Model/
 
+# ML model weights (large binary files)
+services/ml/models/
+
 # Python cache
 *.egg-info/
 dist/

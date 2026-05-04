@@ -262,6 +262,49 @@ function parseYouTubeId(input: string): string | null {
   return null;
 }
 
+function normalizeMathDelimiters(input: string): string {
+  return input
+    .split(/(```[\s\S]*?```)/g)
+    .map((block) => {
+      if (block.startsWith("```")) {
+        return block;
+      }
+
+      return block
+        .split(/(`[^`\n]*`)/g)
+        .map((segment) => {
+          if (segment.startsWith("`")) {
+            return segment;
+          }
+
+          const withStandardDelimiters = segment
+            .replace(/\\\[([\s\S]+?)\\\]/g, (_, expr: string) => {
+              return `\n\n$$\n${expr.trim()}\n$$\n\n`;
+            })
+            .replace(/\\\(([\s\S]+?)\\\)/g, (_, expr: string) => {
+              return `$${expr.trim()}$`;
+            });
+
+          return withStandardDelimiters.replace(
+            /(^|\n\s*\n)\[\s*([\s\S]+?)\s*\](?=\n\s*\n|$)/g,
+            (match: string, prefix: string, expr: string) => {
+              if (!looksLikeLatexMath(expr)) {
+                return match;
+              }
+
+              return `${prefix}$$\n${expr.trim()}\n$$`;
+            },
+          );
+        })
+        .join("");
+    })
+    .join("");
+}
+
+function looksLikeLatexMath(input: string): boolean {
+  return /\\[a-zA-Z]+|[_^]|[=<>]|\{.+\}/.test(input);
+}
+
 function YouTubeEmbed({ videoId }: { videoId: string }) {
   return (
     <div className="rounded-xl overflow-hidden shadow-md border border-border mt-3 w-full">
@@ -431,6 +474,7 @@ export function MessageBubble({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const { personalization } = usePersonalization();
   const studyPrompt = parseStudyPrompt(message.content);
+  const renderedContent = normalizeMathDelimiters(message.content);
 
   const formatTime = (date: Date) =>
     date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -465,7 +509,7 @@ export function MessageBubble({
                     false,
                   ) as any
                 }>
-                {message.content}
+                {renderedContent}
               </ReactMarkdown>
             </div>
             {message.files && message.files.length > 0 && (
@@ -552,7 +596,7 @@ export function MessageBubble({
                     isStreaming,
                   ) as any
                 }>
-                {message.content}
+                {renderedContent}
               </ReactMarkdown>
             </div>
           )}

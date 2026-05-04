@@ -1,5 +1,0 @@
-ollama
-sentence-transformers
-faiss-cpu
-flask
-numpy

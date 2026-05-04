@@ -1,12 +1,16 @@
 {
-  "name": "my-v0-project",
+  "name": "clarity-project",
+  "description": "AI-powered study platform with a Next.js frontend and a Python CRAG backend.",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "npx concurrently -n \"next,flask\" -c \"cyan,yellow\" \"next dev --webpack\" \".venv/bin/python app.py\"",
-    "flask": ".venv/bin/python app.py",
+    "dev": "npx concurrently -n \"next,flask\" -c \"cyan,yellow\" \"npm run dev:web\" \"npm run dev:backend\"",
+    "dev:web": "next dev --webpack",
+    "dev:backend": "if [ -x .venv/bin/python ]; then .venv/bin/python services/backend/app.py; else python3 services/backend/app.py; fi",
+    "flask": "npm run dev:backend",
     "lint": "eslint .",
+    "train:model": "python3 services/ml/train.py",
     "start": "next start"
   },
   "dependencies": {

@@ -1,12 +1,14 @@
 /**
  * CRAG Generator — mirrors generator.py
  *
- * Calls the Python Flask microservice (app.py) which uses Ollama (qwen2.5:3b)
+ * Calls the Python Flask microservice at services/backend/app.py, which uses
+ * Ollama (qwen2.5:3b)
  * to generate an answer given the corrected context documents.
  * The raw answer is then polished by the configured LLM (Gemini/Groq/Euri)
  * into clean, LaTeX-formatted markdown.
  *
- * Run Flask before starting the dev server: `npm run flask` or `python app.py`
+ * Run Flask before starting the dev server: `npm run flask` or
+ * `python3 services/backend/app.py`
  */
 
 import { AIClient } from "../ai-client";
