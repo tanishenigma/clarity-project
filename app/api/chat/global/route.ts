@@ -122,24 +122,147 @@ function serializeMessageContent(content: unknown): string {
   return String(content ?? "");
 }
 
+const LOCAL_OLLAMA_FALLBACK_NUM_CTX = 16384;
+const LOCAL_OLLAMA_FALLBACK_NUM_PREDICT = 4096;
+const LOCAL_OLLAMA_FALLBACK_TIMEOUT_MS = 240_000;
+const LOCAL_PROMPT_MIN_CHARS = 6000;
+const LOCAL_PROMPT_CHARS_PER_TOKEN = 3;
+const LOCAL_PROMPT_OMISSION_NOTE =
+  "<System>\nEarlier conversation turns were trimmed to fit the local model context window. Focus on the most recent turns.\n</System>";
+
+function truncateMiddle(text: string, maxChars: number): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  if (maxChars <= 16) {
+    return text.slice(0, maxChars);
+  }
+
+  const marker = "\n[...trimmed...]\n";
+  const availableChars = maxChars - marker.length;
+  const headChars = Math.ceil(availableChars / 2);
+  const tailChars = Math.floor(availableChars / 2);
+
+  return `${text.slice(0, headChars)}${marker}${text.slice(-tailChars)}`;
+}
+
+function estimateLocalPromptMaxChars(
+  numCtx: number,
+  numPredict: number,
+): number {
+  const reservedTokens = Math.max(1024, numPredict + 512);
+  const promptTokenBudget = Math.max(2048, numCtx - reservedTokens);
+
+  return Math.max(
+    LOCAL_PROMPT_MIN_CHARS,
+    promptTokenBudget * LOCAL_PROMPT_CHARS_PER_TOKEN,
+  );
+}
+
+function formatLocalChatSegment(role: string, content: string): string {
+  const normalizedContent = content.trim() || "[empty]";
+  return `<${role}>\n${normalizedContent}\n</${role}>`;
+}
+
 function buildLocalChatPrompt(
   messages: Array<HumanMessage | AIMessage | SystemMessage>,
   assistantInstruction = "Reply to the latest user message naturally. Do not repeat the role tags.",
+  { maxChars }: { maxChars?: number } = {},
 ): string {
-  const transcript = messages
-    .map((message) => {
-      const role =
-        message instanceof SystemMessage
-          ? "System"
-          : message instanceof AIMessage
-            ? "Assistant"
-            : "User";
+  const assistantSuffix = `<Assistant>\n${assistantInstruction}`;
 
-      return `<${role}>\n${serializeMessageContent(message.content)}\n</${role}>`;
-    })
+  const segments = messages.map((message) => {
+    const role =
+      message instanceof SystemMessage
+        ? "System"
+        : message instanceof AIMessage
+          ? "Assistant"
+          : "User";
+
+    return {
+      role,
+      text: formatLocalChatSegment(
+        role,
+        serializeMessageContent(message.content),
+      ),
+    };
+  });
+
+  const fullTranscript = segments.map((segment) => segment.text).join("\n\n");
+  const fullPrompt = `${fullTranscript}\n\n${assistantSuffix}`;
+
+  if (!maxChars || fullPrompt.length <= maxChars) {
+    return fullPrompt;
+  }
+
+  if (assistantSuffix.length >= maxChars) {
+    return truncateMiddle(assistantSuffix, maxChars);
+  }
+
+  const transcriptBudget = maxChars - assistantSuffix.length - 2;
+  const systemSegments = segments
+    .filter((segment) => segment.role === "System")
+    .map((segment) => segment.text);
+  const nonSystemSegments = segments
+    .filter((segment) => segment.role !== "System")
+    .map((segment) => segment.text);
+
+  const rawSystemBlock = systemSegments.join("\n\n");
+  const maxSystemChars = rawSystemBlock
+    ? Math.min(
+        rawSystemBlock.length,
+        Math.max(1200, Math.floor(transcriptBudget * 0.25)),
+      )
+    : 0;
+  const systemBlock = rawSystemBlock
+    ? truncateMiddle(rawSystemBlock, maxSystemChars)
+    : "";
+
+  let remainingConversationChars = transcriptBudget - systemBlock.length;
+  if (systemBlock) {
+    remainingConversationChars -= 2;
+  }
+
+  const selectedConversationSegments: string[] = [];
+  let droppedEarlierTurns = false;
+
+  for (let index = nonSystemSegments.length - 1; index >= 0; index -= 1) {
+    const segment = nonSystemSegments[index];
+    const separatorChars = selectedConversationSegments.length > 0 ? 2 : 0;
+
+    if (segment.length + separatorChars <= remainingConversationChars) {
+      selectedConversationSegments.unshift(segment);
+      remainingConversationChars -= segment.length + separatorChars;
+      continue;
+    }
+
+    droppedEarlierTurns = true;
+    if (
+      selectedConversationSegments.length === 0 &&
+      remainingConversationChars > 64
+    ) {
+      selectedConversationSegments.unshift(
+        truncateMiddle(segment, remainingConversationChars),
+      );
+      remainingConversationChars = 0;
+    }
+    break;
+  }
+
+  if (
+    droppedEarlierTurns &&
+    selectedConversationSegments.length > 0 &&
+    LOCAL_PROMPT_OMISSION_NOTE.length + 2 <= remainingConversationChars
+  ) {
+    selectedConversationSegments.unshift(LOCAL_PROMPT_OMISSION_NOTE);
+  }
+
+  const trimmedTranscript = [systemBlock, ...selectedConversationSegments]
+    .filter(Boolean)
     .join("\n\n");
 
-  return `${transcript}\n\n<Assistant>\n${assistantInstruction}`;
+  return `${trimmedTranscript}\n\n${assistantSuffix}`;
 }
 
 async function invokeWithOllamaFallback(
@@ -149,13 +272,18 @@ async function invokeWithOllamaFallback(
     assistantInstruction?: string;
     temperature?: number;
     numPredict?: number;
+    numCtx?: number;
     timeoutMs?: number;
+    maxPromptChars?: number;
   } = {},
 ): Promise<string> {
   try {
     const response = await model.invoke(messages);
     return serializeMessageContent(response.content).trim();
   } catch (providerError) {
+    const numPredict = options.numPredict ?? 2048;
+    const numCtx = options.numCtx ?? LOCAL_OLLAMA_FALLBACK_NUM_CTX;
+
     console.warn(
       "[GlobalChat] Provider invoke failed, trying local Ollama fallback:",
       providerError instanceof Error ? providerError.message : providerError,
@@ -163,10 +291,15 @@ async function invokeWithOllamaFallback(
 
     return (
       await invokeLocalOllama(
-        buildLocalChatPrompt(messages, options.assistantInstruction),
+        buildLocalChatPrompt(messages, options.assistantInstruction, {
+          maxChars:
+            options.maxPromptChars ??
+            estimateLocalPromptMaxChars(numCtx, numPredict),
+        }),
         {
           temperature: options.temperature ?? 0.35,
-          numPredict: options.numPredict ?? 2048,
+          numPredict,
+          numCtx,
           timeoutMs: options.timeoutMs ?? 90_000,
         },
       )
@@ -499,11 +632,19 @@ Respond with a 3-6 word title only.`,
             );
 
             fullResponse = await invokeLocalOllama(
-              buildLocalChatPrompt(modelMessages),
+              buildLocalChatPrompt(modelMessages, undefined, {
+                maxChars: estimateLocalPromptMaxChars(
+                  LOCAL_OLLAMA_FALLBACK_NUM_CTX,
+                  LOCAL_OLLAMA_FALLBACK_NUM_PREDICT,
+                ),
+              }),
               {
                 temperature: 0.35,
-                numPredict: 4096,
-                timeoutMs: 90_000,
+                numPredict: LOCAL_OLLAMA_FALLBACK_NUM_PREDICT,
+                numCtx: LOCAL_OLLAMA_FALLBACK_NUM_CTX,
+                timeoutMs: LOCAL_OLLAMA_FALLBACK_TIMEOUT_MS,
+                continueOnLength: true,
+                maxContinuations: 3,
               },
             );
 

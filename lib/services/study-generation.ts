@@ -12,7 +12,17 @@ export type StudyDifficulty = "easy" | "medium" | "hard";
 interface LocalOllamaOptions {
   temperature?: number;
   numPredict?: number;
+  numCtx?: number;
   timeoutMs?: number;
+  continueOnLength?: boolean;
+  maxContinuations?: number;
+}
+
+interface OllamaGenerateResponse {
+  response?: string;
+  done?: boolean;
+  done_reason?: string;
+  context?: number[];
 }
 
 interface FlashcardDraft {
@@ -30,6 +40,61 @@ interface QuizDraft {
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "qwen2.5:3b";
+
+function readPositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const DEFAULT_OLLAMA_NUM_CTX = readPositiveInt(
+  process.env.OLLAMA_NUM_CTX,
+  16384,
+);
+const DEFAULT_OLLAMA_TIMEOUT_MS = readPositiveInt(
+  process.env.OLLAMA_TIMEOUT_MS,
+  240_000,
+);
+
+async function generateWithOllama(
+  prompt: string,
+  {
+    temperature,
+    numPredict,
+    numCtx,
+    timeoutMs,
+    context,
+  }: {
+    temperature: number;
+    numPredict: number;
+    numCtx: number;
+    timeoutMs: number;
+    context?: number[];
+  },
+): Promise<OllamaGenerateResponse> {
+  const response = await fetch(`${OLLAMA_HOST}/api/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      prompt,
+      stream: false,
+      context,
+      options: {
+        temperature,
+        num_predict: numPredict,
+        num_ctx: numCtx,
+      },
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => response.statusText);
+    throw new Error(`Local Ollama error ${response.status}: ${errorText}`);
+  }
+
+  return (await response.json()) as OllamaGenerateResponse;
+}
 
 function buildCombinedText(contents: any[], maxChars = 5000) {
   return contents
@@ -108,31 +173,42 @@ export async function invokeLocalOllama(
   {
     temperature = 0.2,
     numPredict = 2048,
-    timeoutMs = 120_000,
+    numCtx = DEFAULT_OLLAMA_NUM_CTX,
+    timeoutMs = DEFAULT_OLLAMA_TIMEOUT_MS,
+    continueOnLength = false,
+    maxContinuations = 2,
   }: LocalOllamaOptions = {},
 ): Promise<string> {
-  const response = await fetch(`${OLLAMA_HOST}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      prompt,
-      stream: false,
-      options: {
-        temperature,
-        num_predict: numPredict,
-      },
-    }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  let aggregatedResponse = "";
+  let nextPrompt = prompt;
+  let context: number[] | undefined;
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => response.statusText);
-    throw new Error(`Local Ollama error ${response.status}: ${errorText}`);
+  for (let continuation = 0; continuation <= maxContinuations; continuation++) {
+    const data = await generateWithOllama(nextPrompt, {
+      temperature,
+      numPredict,
+      numCtx,
+      timeoutMs,
+      context,
+    });
+
+    aggregatedResponse += data.response ?? "";
+
+    const stoppedOnLength = data.done_reason === "length";
+    if (!continueOnLength || !stoppedOnLength) {
+      return aggregatedResponse.trim();
+    }
+
+    if (!data.context || !(data.response ?? "").trim()) {
+      break;
+    }
+
+    context = data.context;
+    nextPrompt =
+      "Continue exactly where you stopped. Do not restart, summarize, or repeat earlier text. Finish the current answer naturally.";
   }
 
-  const data = (await response.json()) as { response?: string };
-  return data.response?.trim() ?? "";
+  return aggregatedResponse.trim();
 }
 
 async function invokeFlashcardsLocally(
