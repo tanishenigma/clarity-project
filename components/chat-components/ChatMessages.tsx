@@ -1,12 +1,12 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Quote, Upload } from "lucide-react";
-import { MessageBubble } from "../chat-components/MessageBubble";
+import { MessageBubble } from "./MessageBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { EmptyState } from "./EmptyState";
 import { GraphViewer } from "@/components/chat-components/GraphViewer";
 import { FeedbackLog } from "@/components/chat-components/FeedbackLog";
-import { Message } from "../chat-components/types";
-import type { Citation } from "../chat-components/types";
+import { Message } from "./types";
+import type { Citation } from "./types";
 
 interface ChatMessagesProps {
   messages: Message[];

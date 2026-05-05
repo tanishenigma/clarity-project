@@ -20,8 +20,8 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { Message } from "../chat-components/types";
-import type { Citation } from "../chat-components/types";
+import { Message } from "./types";
+import type { Citation } from "./types";
 
 const FLASHCARD_PROMPT_PREFIX =
   "I can generate flashcards for this study space.";

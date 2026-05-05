@@ -2,7 +2,7 @@ import { History, Plus, Search, Loader2, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConversationCard } from "./ConversationCard";
-import { Conversation } from "../chat-components/types";
+import { Conversation } from "./types";
 import { motion, AnimatePresence } from "motion/react"; // Added Framer Motion
 
 interface ChatSidebarProps {

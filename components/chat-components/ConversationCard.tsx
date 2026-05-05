@@ -13,7 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { Conversation } from "../chat-components/types";
+import { Conversation } from "./types";
 
 interface ConversationCardProps {
   conversation: Conversation;
