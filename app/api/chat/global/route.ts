@@ -353,7 +353,11 @@ export async function POST(request: NextRequest) {
     const personalizationPrompt =
       buildPersonalizationPrompt(chatPersonalization);
     const model = new AIClient(MODEL_NAME, 0.7, userSettings);
-    console.log("AI client initialized with model:", MODEL_NAME);
+    console.log(
+      "AI client initialized: provider=%s model-arg=%s",
+      userSettings?.primaryProvider || "gemini",
+      MODEL_NAME,
+    );
 
     // Detect graph intent from keywords in the current message OR recent history.
     // Checking history handles cases like "regenerate that graph" / "show me that"

@@ -12,20 +12,48 @@ export interface IUser extends Document {
   studyStreak: number;
   totalStudyMinutes: number;
   apiSettings?: {
-    primaryProvider: "gemini" | "openai" | "euri" | "groq" | "custom";
+    primaryProvider:
+      | "gemini"
+      | "openai"
+      | "anthropic"
+      | "groq"
+      | "openrouter"
+      | "ollama"
+      | "lmstudio"
+      | "vllm"
+      | "custom";
+    selectedModel?: string;
+    modelSource?: "cloud" | "local";
     apiKeys: {
       gemini?: string;
       openai?: string;
-      euri?: string;
+      anthropic?: string;
       groq?: string;
+      openrouter?: string;
       custom?: {
         name: string;
         apiKey: string;
         endpoint: string;
       };
     };
+    localEndpoints?: {
+      ollama?: string;
+      lmstudio?: string;
+      vllm?: string;
+      custom?: string;
+    };
+    uploadsFolder?: string;
     fallbackEnabled: boolean;
-    fallbackProvider?: "gemini" | "openai" | "euri" | "groq";
+    fallbackProvider?:
+      | "gemini"
+      | "openai"
+      | "anthropic"
+      | "groq"
+      | "openrouter"
+      | "ollama"
+      | "lmstudio"
+      | "vllm"
+      | "custom";
     updatedAt: Date;
   };
   chatbotPersonalization?: {
@@ -66,23 +94,53 @@ const UserSchema = new Schema<IUser>(
     apiSettings: {
       primaryProvider: {
         type: String,
-        enum: ["gemini", "openai", "euri", "groq", "custom"],
+        enum: [
+          "gemini",
+          "openai",
+          "anthropic",
+          "groq",
+          "openrouter",
+          "ollama",
+          "lmstudio",
+          "vllm",
+          "custom",
+        ],
       },
+      selectedModel: String,
+      modelSource: { type: String, enum: ["cloud", "local"] },
       apiKeys: {
         gemini: String,
         openai: String,
-        euri: String,
+        anthropic: String,
         groq: String,
+        openrouter: String,
         custom: {
           name: String,
           apiKey: String,
           endpoint: String,
         },
       },
+      localEndpoints: {
+        ollama: String,
+        lmstudio: String,
+        vllm: String,
+        custom: String,
+      },
+      uploadsFolder: String,
       fallbackEnabled: { type: Boolean, default: true },
       fallbackProvider: {
         type: String,
-        enum: ["gemini", "openai", "euri", "groq"],
+        enum: [
+          "gemini",
+          "openai",
+          "anthropic",
+          "groq",
+          "openrouter",
+          "ollama",
+          "lmstudio",
+          "vllm",
+          "custom",
+        ],
       },
       updatedAt: Date,
     },

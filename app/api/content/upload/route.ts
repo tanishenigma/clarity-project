@@ -2,32 +2,44 @@ import { type NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { ContentIngestionAgent } from "@/lib/agents/content-agent";
 import ContentModel from "@/lib/models/Content";
+import { getUploadsRoot } from "@/lib/utils/storage";
+import fs from "fs/promises";
+import path from "path";
+import crypto from "crypto";
 
 // Allow up to 2 minutes for large file uploads
 export const maxDuration = 120;
 
-import { utapi } from "@/lib/uploadthing";
-
-interface UploadThingResult {
+interface LocalUploadResult {
   secure_url: string;
   public_id: string;
 }
 
-// Upload file to UploadThing
-async function uploadToUploadThing(file: File): Promise<UploadThingResult> {
+// Save file to local disk and return a local URL
+async function saveFileLocally(
+  file: File,
+  userId: string,
+  spaceId: string,
+): Promise<LocalUploadResult> {
   console.log(
-    `[Upload/UploadThing] Starting upload: "${file.name}" (${(file.size / 1024).toFixed(1)} KB, type: ${file.type})`,
+    `[Upload/Local] Saving: "${file.name}" (${(file.size / 1024).toFixed(1)} KB, type: ${file.type})`,
   );
 
-  const { data, error } = await utapi.uploadFiles(file);
-  if (error || !data) {
-    console.error("[Upload/UploadThing] upload error:", error);
-    throw error ?? new Error("UploadThing returned no result");
-  }
-  console.log(
-    `[Upload/UploadThing] Upload successful — key: ${data.key}, url: ${data.ufsUrl}`,
-  );
-  return { secure_url: data.ufsUrl, public_id: data.key };
+  const ext = path.extname(file.name) || "";
+  const filename = `${crypto.randomUUID()}${ext}`;
+  const relativeKey = `${userId}/${spaceId}/${filename}`;
+  const uploadsRoot = await getUploadsRoot(userId);
+  const absolutePath = path.join(uploadsRoot, userId, spaceId, filename);
+
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(absolutePath, buffer);
+
+  console.log(`[Upload/Local] Saved to: ${absolutePath}`);
+  return {
+    secure_url: `/api/files/${relativeKey}`,
+    public_id: relativeKey,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -70,8 +82,8 @@ export async function POST(request: NextRequest) {
       `[Upload] Detected content type: ${detectedType} (MIME: ${file.type})`,
     );
 
-    // Upload to UploadThing
-    const uploadResult = await uploadToUploadThing(file);
+    // Save to local disk
+    const uploadResult = await saveFileLocally(file, userId, spaceId);
 
     console.log("[Upload] Connecting to DB…");
     await connectDB();

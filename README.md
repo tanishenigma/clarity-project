@@ -165,9 +165,6 @@ CRAG_FLASK_URL=http://localhost:5001
 ```bash
 AI_MODEL=gemini-2.5-flash-lite
 AI_VISION_MODEL=gemini-2.5-flash-lite
-GOOGLE_API_KEY=
-GROQ_API_KEY=
-EURI_API_KEY=
 ```
 
 ### Upload And Media Variables

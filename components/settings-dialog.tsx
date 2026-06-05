@@ -193,7 +193,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <Card className="p-4 md:p-5 border-border bg-card/50">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
-                  <p className="font-medium text-foreground">Display Mode</p>
+                  <p className="font-medium text-foreground">Theme Toggle</p>
                   <p className="text-sm text-muted-foreground">
                     Switch between light and dark mode
                   </p>
@@ -348,7 +348,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                       <div>
                         <p className="font-medium text-foreground">
-                          Display Mode
+                          Theme Toggle
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Switch between light and dark mode

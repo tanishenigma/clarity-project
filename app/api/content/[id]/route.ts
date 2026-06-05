@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import ContentModel from "@/lib/models/Content";
-
-import { utapi } from "@/lib/uploadthing";
+import { getUploadsRoot } from "@/lib/utils/storage";
+import fs from "fs/promises";
+import path from "path";
 
 // DELETE - Remove content
 export async function DELETE(
@@ -26,16 +27,17 @@ export async function DELETE(
       return NextResponse.json({ error: "Content not found" }, { status: 404 });
     }
 
-    // Delete from UploadThing if fileKey exists
+    // Delete from local disk if fileKey exists
     if (content.source?.fileKey) {
       try {
+        const uploadsRoot = await getUploadsRoot(content.userId.toString());
         console.log(
-          `[Content DELETE] Deleting from UploadThing: ${content.source.fileKey}`,
+          `[Content DELETE] Removing local file: ${content.source.fileKey}`,
         );
-        await utapi.deleteFiles(content.source.fileKey);
+        await fs.unlink(path.join(uploadsRoot, content.source.fileKey));
       } catch (deleteError) {
-        console.error("UploadThing delete error:", deleteError);
-        // Continue with database deletion even if UploadThing fails
+        // File may already be absent; log but don't fail
+        console.error("Local file delete error:", deleteError);
       }
     }
 

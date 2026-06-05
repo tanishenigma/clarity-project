@@ -7,6 +7,9 @@ import QuizModel from "@/lib/models/Quiz";
 import StudySessionModel from "@/lib/models/StudySession";
 import SummaryModel from "@/lib/models/Summary";
 import ChatHistoryModel from "@/lib/models/ChatHistory";
+import { getUploadsRoot } from "@/lib/utils/storage";
+import fs from "fs/promises";
+import path from "path";
 
 // GET - Fetch a single space with all its data
 export async function GET(
@@ -107,6 +110,22 @@ export async function DELETE(
     const { id } = await params;
 
     console.log("[Spaces DELETE] Deleting space and related data for id:", id);
+
+    // Delete all local files for this space before removing DB records
+    const space = await SpaceModel.findById(id, "userId").lean();
+    const spaceOwnerId = space?.userId?.toString() ?? "";
+    const contentItems = await ContentModel.find(
+      { spaceId: id },
+      "source.fileKey",
+    ).lean();
+    if (contentItems.length > 0 && spaceOwnerId) {
+      const uploadsRoot = await getUploadsRoot(spaceOwnerId);
+      await Promise.allSettled(
+        contentItems
+          .filter((c) => c.source?.fileKey)
+          .map((c) => fs.unlink(path.join(uploadsRoot, c.source.fileKey))),
+      );
+    }
 
     await Promise.all([
       SpaceModel.deleteOne({ _id: id }),

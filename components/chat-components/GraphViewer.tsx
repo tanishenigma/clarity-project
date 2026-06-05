@@ -52,6 +52,7 @@ export function GraphViewer({ graphData, className }: GraphViewerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [calculatorReady, setCalculatorReady] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
@@ -112,8 +113,9 @@ export function GraphViewer({ graphData, className }: GraphViewerProps) {
           },
         );
         setIsLoading(false);
+        setCalculatorReady(true);
         // graphData may have already arrived before the calculator was ready.
-        // The update effect will re-run now because scriptLoaded is in its dep array.
+        // The update effect will re-run now because calculatorReady is in its dep array.
       } catch (error) {
         console.error("Failed to initialize Desmos:", error);
         setIsLoading(false);
@@ -175,7 +177,7 @@ export function GraphViewer({ graphData, className }: GraphViewerProps) {
     }
     // Re-run whenever graphData changes OR the calculator finishes initialising.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphData, scriptLoaded]);
+  }, [graphData, calculatorReady]);
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);

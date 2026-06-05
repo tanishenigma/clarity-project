@@ -45,16 +45,75 @@ export function createDynamicDesmosManager(
   userSettings?: APISettings,
 ) {
   // --- Private State ---
+  // Graph agents need reliable structured-JSON output. Build a settings
+  // object that prefers capable cloud providers (via env keys) but falls
+  // back to whatever the user has configured (including local models).
+  // This prevents small local models from being used for JSON generation
+  // when a cloud key is available in the environment.
+  const graphAgentSettings: APISettings | undefined = (() => {
+    const hasEnvGemini = !!process.env.GOOGLE_API_KEY;
+    const hasEnvAnthropic = !!process.env.ANTHROPIC_API_KEY;
+    const hasEnvOpenAI = !!process.env.OPENAI_API_KEY;
+    const hasEnvGroq = !!process.env.GROQ_API_KEY;
+
+    if (hasEnvGemini) {
+      return {
+        ...(userSettings ?? ({} as APISettings)),
+        primaryProvider: "gemini" as const,
+        selectedModel: "gemini-2.5-flash-lite",
+        apiKeys: {
+          ...(userSettings?.apiKeys ?? {}),
+          gemini: process.env.GOOGLE_API_KEY,
+        },
+      } as APISettings;
+    }
+    if (hasEnvAnthropic) {
+      return {
+        ...(userSettings ?? ({} as APISettings)),
+        primaryProvider: "anthropic" as const,
+        selectedModel: undefined,
+        apiKeys: {
+          ...(userSettings?.apiKeys ?? {}),
+          anthropic: process.env.ANTHROPIC_API_KEY,
+        },
+      } as APISettings;
+    }
+    if (hasEnvOpenAI) {
+      return {
+        ...(userSettings ?? ({} as APISettings)),
+        primaryProvider: "openai" as const,
+        selectedModel: undefined,
+        apiKeys: {
+          ...(userSettings?.apiKeys ?? {}),
+          openai: process.env.OPENAI_API_KEY,
+        },
+      } as APISettings;
+    }
+    if (hasEnvGroq) {
+      return {
+        ...(userSettings ?? ({} as APISettings)),
+        primaryProvider: "groq" as const,
+        selectedModel: undefined,
+        apiKeys: {
+          ...(userSettings?.apiKeys ?? {}),
+          groq: process.env.GROQ_API_KEY,
+        },
+      } as APISettings;
+    }
+    // No env cloud keys → use the user's own settings (may be Ollama)
+    return userSettings;
+  })();
+
   const mathAgent = new AIClient(
     "gemini-2.5-flash-lite",
     0.7,
-    userSettings,
+    graphAgentSettings,
     /* jsonMode */ true,
   );
   const analyzerAgent = new AIClient(
     "gemini-2.5-flash-lite",
     0.8,
-    userSettings,
+    graphAgentSettings,
   );
   let currentGraph: GraphUpdate = { expressions: [] };
   let feedbackLoop: AgentFeedback[] = [];
@@ -200,7 +259,7 @@ IMPORTANT: All backslashes in latex strings must be doubled in JSON: \\\\frac, \
     const content = response.content.toString();
 
     // Extract JSON from response using the robust parser (handles LaTeX backslashes
-    // from Groq / euri / Gemini without corrupting \frac, \nabla, \theta, etc.)
+    // from Groq / Anthropic / Gemini without corrupting \frac, \nabla, \theta, etc.)
     let parsed: any;
     try {
       parsed = parseAIJson<any>(content);

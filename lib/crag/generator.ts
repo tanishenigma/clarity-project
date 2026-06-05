@@ -4,7 +4,7 @@
  * Calls the Python Flask microservice at services/backend/app.py, which uses
  * Ollama (qwen2.5:3b)
  * to generate an answer given the corrected context documents.
- * The raw answer is then polished by the configured LLM (Gemini/Groq/Euri)
+ * The raw answer is then polished by the configured LLM (Gemini/Groq/Claude)
  * into clean, LaTeX-formatted markdown.
  *
  * Run Flask before starting the dev server: `npm run flask` or
@@ -124,8 +124,9 @@ export async function generateAnswer(
     "[CRAG Ollama] Using user API key:",
     !!(
       userSettings?.apiKeys?.gemini ||
-      userSettings?.apiKeys?.euri ||
-      userSettings?.apiKeys?.groq
+      (userSettings?.apiKeys as any)?.anthropic ||
+      userSettings?.apiKeys?.groq ||
+      (userSettings?.apiKeys as any)?.openai
     ),
     userSettings?.primaryProvider
       ? `(provider: ${userSettings.primaryProvider})`

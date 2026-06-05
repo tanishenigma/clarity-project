@@ -51,3 +51,6 @@ services/ml/models/
 # Python cache
 *.egg-info/
 dist/
+
+# local file uploads (stored on disk, not tracked in git)
+/uploads

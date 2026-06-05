@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ReactLenis } from "lenis/react";
-import { motion } from "framer-motion";
+import { BlurFade } from "@/components/ui/blur-fade";
 import RotatingText from "@/components/ui/rotating-text";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -13,9 +13,12 @@ import { Navbar } from "@/components/layout/navbar";
 import Image from "next/image";
 import spaceImage from "@/public/image.png";
 import spaceImageDark from "@/public/image_dark.png";
-import logoLight from "@/public/logo_light.png";
-import logoDark from "@/public/logo_dark.png";
+
 import { useEffect } from "react";
+import Footer from "./footer";
+import CTASection from "./cta-section";
+import Features from "./features";
+import FAQSection from "./faq-section";
 
 const ContainerScroll = dynamic(
   () =>
@@ -35,30 +38,8 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const BlurFade = ({
-  children,
-  className,
-  delay = 0,
-  yOffset = 24,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  delay?: number;
-  yOffset?: number;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: yOffset, filter: "blur(12px)" }}
-    whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-    viewport={{ once: true, margin: "-40px" }}
-    transition={{ duration: 0.9, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
-    className={cn("w-full", className)}>
-    {children}
-  </motion.div>
-);
-
 export default function LandingPage() {
   const lenis = useLenis();
-  const year = new Date().getFullYear();
   useEffect(() => {
     if (!lenis) return;
 
@@ -111,12 +92,12 @@ export default function LandingPage() {
 
           <div className="mt-10 flex items-center justify-center gap-3">
             <Link href="/auth">
-              <button className="h-12 px-7 rounded-full bg-foreground text-background text-sm font-semibold hover:bg-foreground/85 transition-colors">
+              <button className="h-12 px-7 rounded-full bg-foreground text-background text-sm font-semibold hover:bg-foreground/85 transition-colors cursor-pointer">
                 Get started free
               </button>
             </Link>
             <Link href="#features">
-              <button className="h-12 px-7 rounded-full border border-border text-sm font-medium text-foreground/80 hover:bg-muted transition-colors">
+              <button className="h-12 px-7 rounded-full border border-border text-sm font-medium text-foreground/80 hover:bg-muted transition-colors cursor-pointer">
                 See how it works
               </button>
             </Link>
@@ -201,106 +182,10 @@ export default function LandingPage() {
         </section>
 
         {/* Features */}
-        <section
-          id="features"
-          className="relative z-10 py-28 px-4 grid items-center justify-center">
-          <div className="max-w-6xl mx-auto">
-            <BlurFade className="text-center mb-16">
-              <h2 className="text-4xl md:text-6xl font-bold">
-                Everything to <span className="text-primary">excel</span>
-              </h2>
-              <p className="text-muted-foreground mt-4 text-lg max-w-xl mx-auto">
-                Comprehensive tools built for the way you actually study.
-              </p>
-            </BlurFade>
-            <BlurFade>
-              <MagicBento
-                textAutoHide={true}
-                enableStars
-                enableSpotlight={true}
-                enableBorderGlow={false}
-                enableTilt={false}
-                enableMagnetism
-                clickEffect
-                spotlightRadius={160}
-                particleCount={25}
-                disableAnimations={false}
-              />
-            </BlurFade>
-          </div>
-        </section>
-
-        {/* CTA */}
-        <section className="relative z-10 py-28 px-4">
-          <BlurFade>
-            <div className="relative max-w-4xl mx-auto rounded-3xl overflow-hidden bg-card/30 backdrop-blur-2xl border border-border/50 px-8 py-24 text-center shadow-2xl">
-              <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
-              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-soft-light pointer-events-none" />
-              <div className="relative z-10 space-y-5">
-                <h2 className="text-4xl md:text-6xl font-bold">
-                  Ready to transform
-                  <br />
-                  your grades?
-                </h2>
-                <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-                  Join students already improving their learning efficiency with
-                  AI.
-                </p>
-                <div className="flex items-center justify-center gap-3 pt-2">
-                  <Link href="/auth">
-                    <button className="h-12 px-8 rounded-full bg-foreground text-background text-sm font-semibold hover:bg-foreground/85 transition-colors">
-                      Get started free
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </BlurFade>
-        </section>
-
-        {/* Footer */}
-        <footer className="relative z-10 py-10 border-t border-border/30">
-          <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Image
-                src={logoLight}
-                alt="Clarity"
-                width={84}
-                height={20}
-                sizes="84px"
-                className="dark:hidden"
-              />
-              <Image
-                src={logoDark}
-                alt="Clarity"
-                width={84}
-                height={20}
-                sizes="84px"
-                className="hidden dark:block"
-              />
-            </div>
-            <div className="flex gap-6 text-sm text-muted-foreground">
-              <Link
-                href="#"
-                className="hover:text-foreground transition-colors">
-                Privacy
-              </Link>
-              <Link
-                href="#"
-                className="hover:text-foreground transition-colors">
-                Terms
-              </Link>
-              <Link
-                href="#"
-                className="hover:text-foreground transition-colors">
-                Contact
-              </Link>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              © {year} Clarity.
-            </div>
-          </div>
-        </footer>
+        <Features />
+        <FAQSection />
+        <CTASection />
+        <Footer />
       </div>
     </ReactLenis>
   );

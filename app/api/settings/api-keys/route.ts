@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       primaryProvider: "gemini",
       apiKeys: {},
       fallbackEnabled: true,
-      fallbackProvider: "euri",
+      fallbackProvider: "anthropic",
       updatedAt: new Date(),
     };
 
@@ -53,19 +53,25 @@ export async function GET(request: NextRequest) {
         openai: apiSettings.apiKeys?.openai
           ? maskApiKey(apiSettings.apiKeys.openai)
           : undefined,
-        euri: apiSettings.apiKeys?.euri
-          ? maskApiKey(apiSettings.apiKeys.euri)
+        anthropic: (apiSettings.apiKeys as any)?.anthropic
+          ? maskApiKey((apiSettings.apiKeys as any).anthropic)
           : undefined,
         groq: apiSettings.apiKeys?.groq
           ? maskApiKey(apiSettings.apiKeys.groq)
+          : undefined,
+        openrouter: (apiSettings.apiKeys as any)?.openrouter
+          ? maskApiKey((apiSettings.apiKeys as any).openrouter)
           : undefined,
       },
       hasKeys: {
         gemini: !!apiSettings.apiKeys?.gemini,
         openai: !!apiSettings.apiKeys?.openai,
-        euri: !!apiSettings.apiKeys?.euri,
+        anthropic: !!(apiSettings.apiKeys as any)?.anthropic,
         groq: !!apiSettings.apiKeys?.groq,
+        openrouter: !!(apiSettings.apiKeys as any)?.openrouter,
       },
+      localEndpoints: (apiSettings as any).localEndpoints || {},
+      uploadsFolder: (apiSettings as any).uploadsFolder || "",
     });
   } catch (error) {
     console.error("Error fetching API settings:", error);
@@ -112,16 +118,45 @@ export async function PUT(request: NextRequest) {
           ...(isRealKey(updates.apiKeys?.openai) && {
             "apiSettings.apiKeys.openai": updates.apiKeys!.openai,
           }),
-          ...(isRealKey(updates.apiKeys?.euri) && {
-            "apiSettings.apiKeys.euri": updates.apiKeys!.euri,
+          ...(isRealKey((updates.apiKeys as any)?.anthropic) && {
+            "apiSettings.apiKeys.anthropic": (updates.apiKeys as any)!
+              .anthropic,
           }),
           ...(isRealKey(updates.apiKeys?.groq) && {
             "apiSettings.apiKeys.groq": updates.apiKeys!.groq,
+          }),
+          ...(isRealKey((updates.apiKeys as any)?.openrouter) && {
+            "apiSettings.apiKeys.openrouter": (updates.apiKeys as any)!
+              .openrouter,
           }),
           ...(updates.apiKeys?.custom &&
             isRealKey(updates.apiKeys.custom.apiKey) && {
               "apiSettings.apiKeys.custom": updates.apiKeys.custom,
             }),
+          // Local endpoints
+          ...((updates as any).localEndpoints?.ollama && {
+            "apiSettings.localEndpoints.ollama": (updates as any).localEndpoints
+              .ollama,
+          }),
+          ...((updates as any).localEndpoints?.lmstudio && {
+            "apiSettings.localEndpoints.lmstudio": (updates as any)
+              .localEndpoints.lmstudio,
+          }),
+          ...((updates as any).localEndpoints?.vllm && {
+            "apiSettings.localEndpoints.vllm": (updates as any).localEndpoints
+              .vllm,
+          }),
+          // Model preferences
+          ...((updates as any).selectedModel && {
+            "apiSettings.selectedModel": (updates as any).selectedModel,
+          }),
+          ...((updates as any).modelSource && {
+            "apiSettings.modelSource": (updates as any).modelSource,
+          }),
+          // Uploads folder
+          ...((updates as any).uploadsFolder !== undefined && {
+            "apiSettings.uploadsFolder": (updates as any).uploadsFolder,
+          }),
         },
       },
     );

@@ -1,5 +1,8 @@
 import type { Types } from "mongoose";
+import type { ProviderName } from "./providers/types";
 type ObjectId = Types.ObjectId;
+
+export type { ProviderName };
 
 export interface User {
   _id?: ObjectId;
@@ -16,20 +19,34 @@ export interface User {
 }
 
 export interface APISettings {
-  primaryProvider: "gemini" | "openai" | "euri" | "groq" | "custom";
+  primaryProvider: ProviderName;
+  /** Model ID selected within the primary provider */
+  selectedModel?: string;
+  /** Whether to use cloud or local models */
+  modelSource?: "cloud" | "local";
   apiKeys: {
     gemini?: string;
     openai?: string;
-    euri?: string;
+    anthropic?: string;
     groq?: string;
+    openrouter?: string;
     custom?: {
       name: string;
       apiKey: string;
       endpoint: string;
     };
   };
+  /** Base URLs for local model providers */
+  localEndpoints?: {
+    ollama?: string;
+    lmstudio?: string;
+    vllm?: string;
+    custom?: string;
+  };
+  /** Absolute path to the local uploads folder (Obsidian-style storage) */
+  uploadsFolder?: string;
   fallbackEnabled: boolean;
-  fallbackProvider?: "gemini" | "openai" | "euri" | "groq";
+  fallbackProvider?: ProviderName;
   updatedAt: Date;
 }
 
