@@ -1,6 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { Types } from "mongoose";
 import { ContentModel } from "@/lib/models";
+import fs from "fs/promises";
 
 interface AgentMessage {
   agentId: string;
@@ -20,9 +21,14 @@ interface AgentMessage {
 export class ContentIngestionAgent {
   private messageQueue: AgentMessage[] = [];
 
-  async processContent(contentId: string, fileBuffer?: Buffer): Promise<void> {
+  /**
+   * Processes uploaded content.
+   * @param contentId The ID of the content document.
+   * @param fileSource Either a Buffer or an absolute Path to the file on disk.
+   */
+  async processContent(contentId: string, fileSource?: Buffer | string): Promise<void> {
     console.log(
-      `[ContentAgent] processContent started \u2014 contentId: ${contentId}`,
+      `[ContentAgent] processContent started — contentId: ${contentId}`,
     );
     await connectDB();
     const content = await ContentModel.findById(
@@ -34,7 +40,7 @@ export class ContentIngestionAgent {
       throw new Error("Content not found");
     }
     console.log(
-      `[ContentAgent] Content loaded \u2014 type: ${content.type}, title: "${(content as any).title}", url: ${(content as any).source?.url}`,
+      `[ContentAgent] Content loaded — type: ${content.type}, title: "${(content as any).title}", url: ${(content as any).source?.url}`,
     );
 
     // Emit start event
@@ -53,21 +59,18 @@ export class ContentIngestionAgent {
 
       switch (content.type) {
         case "text":
-          extractedText = content.source.url || "";
-          console.log(
-            `[ContentAgent] Text content loaded (${extractedText.length} chars)`,
-          );
+          extractedText = await this.loadTextSource((content as any).source?.url || "", fileSource);
           break;
         case "pdf":
           extractedText = await this.extractPdfText(
             (content as any).source?.url || "",
-            fileBuffer,
+            fileSource,
           );
           break;
         case "image":
           extractedText = await this.performOCR(
             (content as any).source?.url || "",
-            fileBuffer,
+            fileSource,
           );
           break;
         case "audio":
@@ -83,12 +86,12 @@ export class ContentIngestionAgent {
           break;
         default:
           console.warn(
-            `[ContentAgent] Unknown content type: ${content.type} \u2014 skipping extraction`,
+            `[ContentAgent] Unknown content type: ${content.type} — skipping extraction`,
           );
           extractedText = "";
       }
       console.log(
-        `[ContentAgent] Extraction complete \u2014 ${extractedText.length} chars extracted`,
+        `[ContentAgent] Extraction complete — ${extractedText.length} chars extracted`,
       );
 
       // Step 2: Chunk the text
@@ -102,7 +105,7 @@ export class ContentIngestionAgent {
       );
 
       // Step 4: Store processed content
-      console.log(`[ContentAgent] Saving processed content to DB\u2026`);
+      console.log(`[ContentAgent] Saving processed content to DB…`);
       await ContentModel.updateOne(
         { _id: new Types.ObjectId(contentId) },
         {
@@ -129,7 +132,7 @@ export class ContentIngestionAgent {
 
       // Emit completion event
       console.log(
-        `[ContentAgent] \u2713 Processing complete for contentId: ${contentId}`,
+        `[ContentAgent] ✓ Processing complete for contentId: ${contentId}`,
       );
       this.publishEvent({
         agentId: "content-ingestion",
@@ -144,7 +147,7 @@ export class ContentIngestionAgent {
       });
     } catch (error) {
       console.error(
-        `[ContentAgent] \u2717 Processing failed for contentId: ${contentId}`,
+        `[ContentAgent] ✗ Processing failed for contentId: ${contentId}`,
         error,
       );
       await ContentModel.updateOne(
@@ -171,23 +174,38 @@ export class ContentIngestionAgent {
     }
   }
 
+  private async loadTextSource(url: string, source?: Buffer | string): Promise<string> {
+    if (source) {
+      if (typeof source === "string") {
+        return await fs.readFile(source, "utf-8");
+      }
+      return source.toString("utf-8");
+    }
+    return url;
+  }
+
   private async extractPdfText(
     url: string,
-    fileBuffer?: Buffer,
+    fileSource?: Buffer | string,
   ): Promise<string> {
-    if (!url && !fileBuffer) {
+    if (!url && !fileSource) {
       console.warn(
-        "[ContentAgent/PDF] No URL or buffer provided, skipping PDF extraction",
+        "[ContentAgent/PDF] No URL or source provided, skipping PDF extraction",
       );
       return "";
     }
     try {
       let buffer: Buffer;
-      if (fileBuffer) {
-        console.log(
-          `[ContentAgent/PDF] Using uploaded buffer (${(fileBuffer.length / 1024).toFixed(1)} KB)`,
-        );
-        buffer = fileBuffer;
+      if (fileSource) {
+        if (typeof fileSource === "string") {
+          console.log(`[ContentAgent/PDF] Reading from disk: ${fileSource}`);
+          buffer = await fs.readFile(fileSource);
+        } else {
+          console.log(
+            `[ContentAgent/PDF] Using provided buffer (${(fileSource.length / 1024).toFixed(1)} KB)`,
+          );
+          buffer = fileSource;
+        }
       } else {
         console.log(`[ContentAgent/PDF] Downloading PDF from: ${url}`);
         const response = await fetch(url);
@@ -199,7 +217,7 @@ export class ContentIngestionAgent {
         buffer = Buffer.from(arrayBuffer);
       }
       console.log(
-        `[ContentAgent/PDF] Downloaded ${(buffer.length / 1024).toFixed(1)} KB, parsing\u2026`,
+        `[ContentAgent/PDF] Processing ${(buffer.length / 1024).toFixed(1)} KB, parsing…`,
       );
       const { extractPdfText } = await import("@/lib/utils/pdf-extract");
       const text = await extractPdfText(buffer);
@@ -211,16 +229,16 @@ export class ContentIngestionAgent {
     }
   }
 
-  private async performOCR(url: string, fileBuffer?: Buffer): Promise<string> {
-    if (!url && !fileBuffer) {
+  private async performOCR(url: string, fileSource?: Buffer | string): Promise<string> {
+    if (!url && !fileSource) {
       console.warn(
-        "[ContentAgent/OCR] No URL or buffer provided, skipping OCR",
+        "[ContentAgent/OCR] No URL or source provided, skipping OCR",
       );
       return "";
     }
-    const source = fileBuffer ?? url;
+    const source = fileSource ?? url;
     console.log(
-      `[ContentAgent/OCR] Running Tesseract OCR on: ${fileBuffer ? "(buffer)" : url}`,
+      `[ContentAgent/OCR] Running Tesseract OCR on: ${typeof fileSource === "string" ? fileSource : fileSource ? "(buffer)" : url}`,
     );
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -240,7 +258,7 @@ export class ContentIngestionAgent {
   private async transcribeMedia(url: string): Promise<string> {
     // TODO: Implement transcription using Whisper API
     console.warn(
-      `[ContentAgent/Transcribe] Transcription not implemented yet \u2014 url: ${url}`,
+      `[ContentAgent/Transcribe] Transcription not implemented yet — url: ${url}`,
     );
     return "";
   }
@@ -248,7 +266,7 @@ export class ContentIngestionAgent {
   private async scrapeWebContent(url: string): Promise<string> {
     // TODO: Implement web scraping
     console.warn(
-      `[ContentAgent/Scrape] Web scraping not implemented yet \u2014 url: ${url}`,
+      `[ContentAgent/Scrape] Web scraping not implemented yet — url: ${url}`,
     );
     return "";
   }

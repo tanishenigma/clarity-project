@@ -184,9 +184,9 @@ export default function SpacesPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+      <div className="flex flex-col md:flex-row gap-4 ">
+        <div className="relative flex-1 select-none ">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground cursor-pointer " />
           <Input
             placeholder="Search spaces..."
             value={search}
@@ -195,9 +195,9 @@ export default function SpacesPage() {
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 cursor-pointer">
           <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-            <SelectTrigger className="w-full md:w-50">
+            <SelectTrigger className="w-full md:w-50 cursor-pointer">
               <SelectValue placeholder="All Subjects" />
             </SelectTrigger>
             <SelectContent>

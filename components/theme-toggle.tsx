@@ -1,11 +1,13 @@
-// light theme default
 "use client";
 
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { useThemeStore } from "@/lib/stores/useThemeStore";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  // Grab the state and the action directly from Zustand
+  const { theme, toggleTheme } = useThemeStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -15,14 +17,24 @@ export function ThemeToggle() {
 
   return (
     <button
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        isDark ? "bg-primary" : "bg-muted-foreground/30"
-      }`}>
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          isDark ? "translate-x-6" : "translate-x-1"
-        }`}
+      type="button"
+      className={cn(
+        "relative flex h-6 w-11 items-center rounded-full cursor-pointer p-1 select-none",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "transition-colors duration-300 ease-in-out",
+        isDark
+          ? "bg-primary justify-end"
+          : "bg-muted-foreground/30 justify-start",
+      )}
+      onClick={toggleTheme}>
+      <motion.span
+        layout
+        transition={{
+          type: "spring",
+          stiffness: 700,
+          damping: 30,
+        }}
+        className="inline-block h-4 w-4 rounded-full bg-white shadow-md pointer-events-none"
       />
     </button>
   );

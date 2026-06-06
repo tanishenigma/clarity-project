@@ -2,9 +2,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getAuthJwt } from "@/lib/auth";
 import { getUploadsRoot } from "@/lib/utils/storage";
 import fs from "fs/promises";
+import { createReadStream } from "fs";
 import path from "path";
+import { Readable } from "stream";
 
-// Serve locally stored files with ownership check
+// Serve locally stored files with ownership check and memory efficiency (streaming)
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
@@ -42,17 +44,24 @@ export async function GET(
     const uploadsRoot = await getUploadsRoot(session.userId);
 
     const absolutePath = path.join(uploadsRoot, ...segments);
-    // Ensure the resolved path stays within the uploads root
+    
+    // Security: Ensure the resolved path stays within the uploads root
     if (!absolutePath.startsWith(uploadsRoot + path.sep)) {
       return NextResponse.json({ error: "Invalid file path" }, { status: 400 });
     }
 
-    let fileBuffer: Buffer;
+    // Check if file exists and get its size for Content-Length
+    let stats;
     try {
-      fileBuffer = await fs.readFile(absolutePath);
+      stats = await fs.stat(absolutePath);
+      if (!stats.isFile()) throw new Error("Not a file");
     } catch {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
+
+    // Memory Efficiency: Create a Node.js read stream and convert it to a Web ReadableStream
+    const nodeStream = createReadStream(absolutePath);
+    const webStream = Readable.toWeb(nodeStream);
 
     const filename = segments[segments.length - 1];
     const ext = path.extname(filename).toLowerCase();
@@ -73,17 +82,11 @@ export async function GET(
     };
     const contentType = mimeMap[ext] ?? "application/octet-stream";
 
-    // Copy into a clean ArrayBuffer to satisfy TypeScript DOM types
-    const arrayBuffer = fileBuffer.buffer.slice(
-      fileBuffer.byteOffset,
-      fileBuffer.byteOffset + fileBuffer.byteLength,
-    ) as ArrayBuffer;
-
-    return new NextResponse(arrayBuffer, {
+    return new NextResponse(webStream as any, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Length": fileBuffer.length.toString(),
+        "Content-Length": stats.size.toString(),
         "Cache-Control": "private, max-age=3600",
       },
     });

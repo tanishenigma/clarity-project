@@ -31,7 +31,7 @@ const Footer = () => {
             <Link
               href="https://github.com/tanishenigma"
               className="flex flex-col items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-              <div className="p-1 rounded-full bg-foreground text-background">
+              <div className="p-1 rounded-full bg-primary/15 text-primary">
                 <Github size={16} />
               </div>
               <span>tanishenigma</span>

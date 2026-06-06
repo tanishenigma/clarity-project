@@ -150,7 +150,7 @@ export function ChatbotPersonalizationPanel({ userId }: { userId: string }) {
 
         {/* Tone */}
         <div>
-          <label className="text-sm font-medium text-foreground block mb-2">
+          <label className="text-sm font-medium text-foreground block mb-2 ">
             Personality & Tone
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -159,12 +159,12 @@ export function ChatbotPersonalizationPanel({ userId }: { userId: string }) {
                 key={t.value}
                 type="button"
                 onClick={() => setSettings({ ...settings, tone: t.value })}
-                className={`relative group rounded-3xl border p-4 text-left transition-colors ${
+                className={`relative group rounded-3xl border p-4 text-left transition-colors  cursor-pointer ${
                   settings.tone === t.value
                     ? "border-primary bg-primary/10 text-foreground"
                     : "border-border hover:border-primary/40 hover:bg-muted/50 text-muted-foreground"
                 }`}>
-                <p className="text-sm font-medium leading-none">{t.label}</p>
+                <p className="text-sm font-medium leading-none ">{t.label}</p>
                 <span className="pointer-events-none absolute left-1/2 top-[calc(100%+6px)] -translate-x-1/2 z-50 whitespace-nowrap rounded-lg bg-popover border border-border px-2.5 py-1 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                   {t.description}
                 </span>
@@ -186,7 +186,7 @@ export function ChatbotPersonalizationPanel({ userId }: { userId: string }) {
                 onClick={() =>
                   setSettings({ ...settings, teachingStyle: s.value })
                 }
-                className={`relative group rounded-3xl border p-4 text-left transition-colors ${
+                className={`relative group rounded-3xl border p-4 text-left transition-colors  cursor-pointer ${
                   settings.teachingStyle === s.value
                     ? "border-primary bg-primary/10 text-foreground"
                     : "border-border hover:border-primary/40 hover:bg-muted/50 text-muted-foreground"

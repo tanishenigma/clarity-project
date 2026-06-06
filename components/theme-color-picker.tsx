@@ -28,18 +28,18 @@ export function ThemeColorPicker() {
       <p className="text-xs text-muted-foreground">
         Choose a colour palette for the entire app.
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 ">
         {/* Default option (uses globals.css base) */}
         <button
           onClick={() => handleSelect("cobalt-blue")}
           aria-label="Default theme"
-          className={`group relative flex flex-col items-start gap-2 rounded-sm border p-3 text-left transition-all duration-200 hover:border-primary/60 hover:bg-muted/40 ${
+          className={`group relative flex flex-col items-start gap-2 rounded-sm border p-3 text-left transition-all duration-200 hover:border-primary/60 hover:bg-muted/40 cursor-pointer  ${
             active === "cobalt-blue" || active === null
               ? "border-primary bg-primary/8"
-              : "border-border bg-card"
+              : "border-border bg-card "
           }`}>
           <SwatchDots light="oklch(0.52 0.2 252)" dark="oklch(0.6 0.22 252)" />
-          <span className="text-xs font-medium text-foreground leading-tight">
+          <span className="text-xs font-medium text-foreground leading-tight ">
             Cobalt Blue
           </span>
           {(active === "cobalt-blue" || active === null) && <ActiveBadge />}
@@ -50,7 +50,7 @@ export function ThemeColorPicker() {
             key={theme.id}
             onClick={() => handleSelect(theme.id)}
             aria-label={`${theme.name} theme`}
-            className={`group relative flex flex-col items-start gap-2 rounded-sm border p-3 text-left transition-all duration-200 hover:border-primary/60 hover:bg-muted/40 ${
+            className={`group relative flex flex-col items-start gap-2 rounded-sm border p-3 text-left transition-all duration-200 hover:border-primary/60 hover:bg-muted/40 cursor-pointer ${
               active === theme.id
                 ? "border-primary bg-primary/8"
                 : "border-border bg-card"
@@ -89,7 +89,7 @@ function SwatchDots({ light, dark }: { light: string; dark: string }) {
 
 function ActiveBadge() {
   return (
-    <span className="absolute top-2 right-2 flex items-center justify-center w-4 h-4 rounded-full bg-primary">
+    <span className="absolute top-2 right-2 flex items-center justify-center w-4 h-4 rounded-full bg-primary ">
       <Check className="w-2.5 h-2.5 text-primary-foreground" strokeWidth={3} />
     </span>
   );

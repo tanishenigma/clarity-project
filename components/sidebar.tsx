@@ -215,7 +215,7 @@ export function Sidebar({ spaceId }: SidebarProps) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <span className="text-sm text-foreground/70 flex-1">
+          <span className="text-sm text-foreground/70 flex-1 ">
             Theme Toggle
           </span>
           <ThemeToggle />
@@ -232,7 +232,7 @@ export function Sidebar({ spaceId }: SidebarProps) {
 
   return (
     <div>
-      <header className="fixed top-0 left-0 right-0 z-50 md:hidden flex items-center h-12 px-3 gap-3">
+      <header className="fixed top-0 left-0 right-0 z-50 md:hidden flex items-center h-12 px-3 gap-3 ">
         <button
           onClick={() => setMobileDrawerOpen((v) => !v)}
           className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors shrink-0">
@@ -252,16 +252,16 @@ export function Sidebar({ spaceId }: SidebarProps) {
 
       <aside
         className={[
-          "fixed top-0 left-0 h-full w-72 z-70 md:hidden flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out",
+          "fixed top-0 left-0 h-full w-72 z-70 md:hidden flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out select-none ",
           mobileDrawerOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}>
         <div className="flex items-center px-5 py-4 border-b border-sidebar-border">
           <Link
             href="/"
             onClick={() => setMobileDrawerOpen(false)}
-            className="flex items-center gap-2">
-            <VenetianMask className="w-6 h-6 text-primary" />
-            <span className="font-bold text-lg tracking-tight font-serif">
+            className="flex items-center gap-2 select-none pointer-events-none">
+            <VenetianMask className="w-6 h-6 text-primary select-none pointer-events-none" />
+            <span className="font-bold text-lg tracking-tight select-none pointer-events-none">
               Clarity
             </span>
           </Link>
@@ -347,7 +347,9 @@ export function Sidebar({ spaceId }: SidebarProps) {
               onClick={() => redirect("/")}
               className="flex items-center gap-2 cursor-pointer">
               <VenetianMask className="w-6 h-6 text-primary" />
-              <span className="font-bold text-lg tracking-tight">Clarity</span>
+              <span className="font-bold text-lg tracking-tight select-none pointer-events-none">
+                Clarity
+              </span>
             </div>
             <PanelLeft
               size={16}

@@ -132,7 +132,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const innerContent = (
     <>
       {/* ── Icon tab bar ── */}
-      <div className="flex shrink-0 border-b border-border bg-muted/20">
+      <div className="flex shrink-0 border-b border-border bg-muted/20 ">
         {tabs.map(({ id, short, icon: Icon }) => (
           <button
             key={id}
@@ -152,7 +152,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-5 min-w-0">
         <div className="flex items-center gap-2">
           <ActiveIcon className="w-5 h-5 text-primary shrink-0" />
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg font-semibold text-foreground ">
             {tabs.find((t) => t.id === active)?.label}
           </h2>
         </div>
@@ -224,7 +224,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         {/* Danger Zone */}
         {active === "danger" && (
           <Card className="p-4 md:p-5 border-destructive/40 bg-card/50">
-            <p className="text-sm font-semibold text-destructive mb-1">
+            <p className="text-sm font-semibold text-destructive mb-1 ">
               Danger Zone
             </p>
             <p className="text-sm text-muted-foreground mb-4">
@@ -278,7 +278,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <p className="text-base font-semibold text-foreground">Settings</p>
             <button
               onClick={() => onOpenChange(false)}
-              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors  cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -291,7 +291,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <button
                   key={id}
                   onClick={() => setActive(id)}
-                  className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${
+                  className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150  cursor-pointer ${
                     active === id
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -332,7 +332,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </div>
                   </Card>
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     className="gap-2 border-border"
                     onClick={logout}>
                     <LogOut className="w-4 h-4" />
@@ -345,9 +345,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {active === "appearance" && (
                 <div className="space-y-4">
                   <Card className="p-4 md:p-5 border-border bg-card/50">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center justify-between gap-4 flex-wrap ">
                       <div>
-                        <p className="font-medium text-foreground">
+                        <p className="font-medium text-foreground ">
                           Theme Toggle
                         </p>
                         <p className="text-sm text-muted-foreground">

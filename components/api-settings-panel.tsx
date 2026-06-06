@@ -15,8 +15,16 @@ import {
   BadgeCheck,
   Server,
 } from "lucide-react";
-import { PROVIDER_REGISTRY, CLOUD_PROVIDERS, LOCAL_PROVIDERS } from "@/lib/providers/types";
-import type { CloudProvider, LocalProvider, ProviderName } from "@/lib/providers/types";
+import {
+  PROVIDER_REGISTRY,
+  CLOUD_PROVIDERS,
+  LOCAL_PROVIDERS,
+} from "@/lib/providers/types";
+import type {
+  CloudProvider,
+  LocalProvider,
+  ProviderName,
+} from "@/lib/providers/types";
 
 type CloudProviderKey = CloudProvider;
 
@@ -103,7 +111,13 @@ export function APISettingsPanel({ userId }: { userId: string }) {
           groq: data.hasKeys?.groq ?? false,
           openrouter: data.hasKeys?.openrouter ?? false,
         });
-        setKeyInputs({ gemini: "", openai: "", anthropic: "", groq: "", openrouter: "" });
+        setKeyInputs({
+          gemini: "",
+          openai: "",
+          anthropic: "",
+          groq: "",
+          openrouter: "",
+        });
         if (data.localEndpoints) {
           setLocalEndpoints({
             ollama: data.localEndpoints.ollama || "",
@@ -146,14 +160,20 @@ export function APISettingsPanel({ userId }: { userId: string }) {
       });
 
       if (response.ok) {
-        setMessage({ type: "success", text: "API settings saved successfully!" });
+        setMessage({
+          type: "success",
+          text: "API settings saved successfully!",
+        });
         await fetchSettings();
         setTimeout(() => setMessage(null), 3000);
       } else {
         throw new Error("Failed to save settings");
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to save settings. Please try again." });
+      setMessage({
+        type: "error",
+        text: "Failed to save settings. Please try again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -193,13 +213,13 @@ export function APISettingsPanel({ userId }: { userId: string }) {
                 onClick={() =>
                   setProviderSettings({ ...providerSettings, modelSource: src })
                 }
-                className={`px-4 py-1.5 rounded-md border-2 text-sm font-medium transition-all capitalize ${
+                className={`px-4 py-1.5 rounded-md border-2 text-sm font-medium transition-all capitalize  cursor-pointer ${
                   (providerSettings.modelSource || "cloud") === src
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border hover:border-primary/50"
                 }`}>
                 {src === "local" ? (
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 ">
                     <Server className="w-3 h-3" /> Local
                   </span>
                 ) : (
@@ -218,11 +238,13 @@ export function APISettingsPanel({ userId }: { userId: string }) {
               <label className="block text-sm font-medium text-foreground">
                 Primary AI Provider
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 ">
                 {CLOUD_PROVIDERS.map((p) => {
                   const meta = PROVIDER_REGISTRY[p];
                   return (
-                    <div key={p} className="flex flex-col items-center gap-1.5">
+                    <div
+                      key={p}
+                      className="flex flex-col items-center gap-1.5 ">
                       <button
                         type="button"
                         onClick={() =>
@@ -231,7 +253,7 @@ export function APISettingsPanel({ userId }: { userId: string }) {
                             primaryProvider: p,
                           })
                         }
-                        className={`w-full p-3 rounded-md border-2 transition-all ${
+                        className={`w-full p-3 rounded-md border-2 transition-all  cursor-pointer ${
                           providerSettings.primaryProvider === p
                             ? "border-primary bg-primary/5"
                             : "border-border hover:border-primary/50"
@@ -270,7 +292,9 @@ export function APISettingsPanel({ userId }: { userId: string }) {
                     <div className="relative">
                       <Input
                         type={
-                          showKeys[provider as CloudProviderKey] ? "text" : "password"
+                          showKeys[provider as CloudProviderKey]
+                            ? "text"
+                            : "password"
                         }
                         value={keyInputs[provider as CloudProviderKey]}
                         onChange={(e) =>
@@ -338,7 +362,7 @@ export function APISettingsPanel({ userId }: { userId: string }) {
                       fallbackEnabled: !providerSettings.fallbackEnabled,
                     })
                   }
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors  cursor-pointer ${
                     providerSettings.fallbackEnabled
                       ? "bg-primary"
                       : "bg-muted-foreground/30"
@@ -393,7 +417,7 @@ export function APISettingsPanel({ userId }: { userId: string }) {
               <label className="block text-sm font-medium text-foreground">
                 Local Provider
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-3  ">
                 {LOCAL_PROVIDERS.map((p) => {
                   const meta = PROVIDER_REGISTRY[p];
                   return (
@@ -406,12 +430,14 @@ export function APISettingsPanel({ userId }: { userId: string }) {
                           primaryProvider: p,
                         })
                       }
-                      className={`p-3 rounded-md border-2 transition-all text-left ${
+                      className={`p-3 rounded-md border-2 transition-all text-left  cursor-pointer ${
                         providerSettings.primaryProvider === p
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-primary/50"
                       }`}>
-                      <div className="font-medium text-sm">{meta.displayName}</div>
+                      <div className="font-medium text-sm">
+                        {meta.displayName}
+                      </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {meta.description}
                       </div>
@@ -438,7 +464,9 @@ export function APISettingsPanel({ userId }: { userId: string }) {
                           [provider]: e.target.value,
                         })
                       }
-                      placeholder={meta.defaultEndpoint || "http://localhost:..."}
+                      placeholder={
+                        meta.defaultEndpoint || "http://localhost:..."
+                      }
                     />
                     <p className="text-xs text-muted-foreground">
                       Default: {meta.defaultEndpoint}
